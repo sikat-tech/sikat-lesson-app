@@ -3,20 +3,32 @@ const fs = require("fs");
 const filePath = "lessons.ndjson";
 
 const pack = (lessonObject) => ({
+  id: lessonObject.id,
   t: lessonObject.title,
   d: lessonObject.desc,
 });
 const unpack = (lessonObject) => ({
+  id: lessonObject.id,
   title: lessonObject.t,
   desc: lessonObject.d,
 });
 
+const allocCol = (size) => Buffer.alloc(size);
+
+const bufId = allocCol(64);
+const bufTitle = allocCol(128);
+const bufDesc = allocCol(256);
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-///refractor 
+///refractor
+function nextId() {
+  if (!fs.existsSync(filePath)) return 1;
+  const lines = fs.readFileSync(filePath, "utf8").trim().split("\n").filter(Boolean);
+  return lines.length + 1;
+}
 function appendLesson(lesson) {
   fs.appendFileSync(filePath, JSON.stringify(pack(lesson)) + "\n", "utf8");
 }
@@ -77,7 +89,7 @@ function showPage() {
 
     shown++;
     const l = unpack(JSON.parse(line));
-    console.log(`${skip + shown}. ${l.title} - ${l.desc}`);
+    console.log(`${skip + shown}. [id:${l.id}] ${l.title} - ${l.desc}`);
   });
 
   liner.on("close", () => {
@@ -110,8 +122,8 @@ function createLesson() {
     if (answer === "y") {
       rl.question("Lesson Title: ", (title) => {
         rl.question("Description: ", (desc) => {
-          appendLesson({ title, desc });
-          console.log("\nLesson Created!");
+          const id = nextId();
+          appendLesson({ id, title, desc });
           showmenu();
         });
       });
