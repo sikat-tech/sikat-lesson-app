@@ -114,20 +114,20 @@ function showPage(mode = "view") {
     opts.push("M = Menu");
 
     rl.question(`\n[${opts.join(" | ")}]: `, (ans) => {
-      const key = ans.toUpperCase();
+      const key = ans.toLowerCase();
 
-      if (key.toUpperCase() === "N") {
+      if (key === "N") {
         page++;
         showPage(mode);
-      } else if (key.toUpperCase() === "P" && page > 0) {
+      } else if (key === "P" && page > 0) {
         page--;
         showPage(mode);
-      } else if (key.toUpperCase() === "E" && mode === "edit") {
+      } else if (key === "E" && mode === "edit") {
         updateList();
-      } else if (key.toUpperCase() === "C" && mode === "edit") {
-        showMenu();
-      } else if (key.toUpperCase() === "M") {
-        showMenu();
+      } else if (key === "C" && mode === "edit") {
+        showmenu();
+      } else if (key === "M") {
+        showmenu();
       } else {
         console.log("Invalid Option");
         showmenu();
@@ -150,21 +150,21 @@ function createLesson() {
         rl.question("Description: ", (desc) => {
           const id = getId();
 
-          // added fill to cleanup yung previous data sa buffer bago gumawa bago
-          bufId.fill(0);
-          bufTitle.fill(0);
-          bufDesc.fill(0);
+          // // added fill to cleanup yung previous data sa buffer bago gumawa bago
+          // bufId.fill(0);
+          // bufTitle.fill(0);
+          // bufDesc.fill(0);
 
-          //to input sa mismong buffer
-          bufId.write(id.toString());
-          bufTitle.write(title);
-          bufDesc.write(desc);
+          // //to input sa mismong buffer
+          // bufId.write(id.toString());
+          // bufTitle.write(title);
+          // bufDesc.write(desc);
 
           const lessonObject = {
             id: byteRead(id, COL_ID),
             title: byteRead(title, COL_TITLE),
             desc: byteRead(desc, COL_DESC),
-          }
+          };
 
           appendLesson(lessonObject);
           console.log(`\nLesson Created`);
@@ -195,7 +195,7 @@ function editLesson() {
 }
 
 function updateList() {
-rl.question("Enter lesson ID to edit: ", (id) => {
+  rl.question("Enter lesson ID to edit: ", (id) => {
     if (!fs.existsSync(filePath)) {
       console.log("No Lessons Available");
       return showmenu();
@@ -228,15 +228,14 @@ rl.question("Enter lesson ID to edit: ", (id) => {
     rl.question("New Title : ", (newTitle) => {
       rl.question("New Description: ", (newDesc) => {
         const oldLesson = unpack(JSON.parse(lines[lessonIndex]));
-        
 
-        bufId.fill(0);
-        bufTitle.fill(0);
-        bufDesc.fill(0);
+        // bufId.fill(0);
+        // bufTitle.fill(0);
+        // bufDesc.fill(0);
 
-        bufId.write(oldLesson.id.toString());
-        bufTitle.write(newTitle || oldLesson.title);
-        bufDesc.write(newDesc || oldLesson.desc);
+        // bufId.write(oldLesson.id.toString());
+        // bufTitle.write(newTitle || oldLesson.title);
+        // bufDesc.write(newDesc || oldLesson.desc);
 
         const updatedLesson = {
           id: byteRead(oldLesson.id, COL_ID),
