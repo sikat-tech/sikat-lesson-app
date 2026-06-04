@@ -146,12 +146,37 @@ function viewLesson() {
 }
 
 function editLesson() {
-  if (!fs.existsSync(filePath)) {
-    console.log("No Lessons Available");
+  if (lesson.length === 0) {
+    console.log("No lessons to edit.");
     return showmenu();
   }
 
-  showPage();
+  console.log("\nSelect lesson to edit:\n");
+
+  lesson.forEach((l, i) => {
+    console.log(`${i + 1}. ${l.title}`);
+  });
+
+  rl.question("\nEnter number: ", (num) => {
+    const index = parseInt(num) - 1;
+
+    if (index < 0 || index >= lesson.length) {
+      console.log("Invalid selection");
+      return showmenu();
+    }
+
+    rl.question("New Title: ", (newTitle) => {
+      rl.question("New Description: ", (newDesc) => {
+        lesson[index].title = newTitle;
+        lesson[index].desc = newDesc;
+
+        saveLesson();
+
+        console.log("\nLesson Updated!");
+        showmenu();
+      });
+    });
+  });
 }
 
 showmenu();
