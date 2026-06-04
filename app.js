@@ -13,11 +13,19 @@ const unpack = (lessonObject) => ({
   desc: lessonObject.d,
 });
 
-const allocCol = (size) => Buffer.alloc(size);
+const COL_ID = 12;
+const COL_TITLE = 50;
+const COL_DESC = 256;
 
-const bufId = allocCol(12);
-const bufTitle = allocCol(50);
-const bufDesc = allocCol(256);
+const bufPageLimit = Buffer.alloc(1);
+bufPageLimit.writeUInt8(10);
+const PAGE_LIMIT = bufPageLimit.readUInt8(0);
+
+const byteRead = (value, size) => {
+  const buf = Buffer.alloc(size);
+  buf.write(String(value));
+  return buf.subarray(0, String(value).length).toString();
+};
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -61,7 +69,7 @@ function handleMenu(option) {
 let page = 0;
 
 function showPage(mode = "view") {
-  const skip = page * 10;
+  const skip = page * PAGE_LIMIT;
   let count = 0;
   let shown = 0;
   let hasNext = false;
@@ -78,7 +86,7 @@ function showPage(mode = "view") {
 
     if (count <= skip) return;
 
-    if (shown >= 10) {
+    if (shown >= PAGE_LIMIT) {
       hasNext = true;
       stopped = true;
       getLiner.close();
@@ -153,10 +161,10 @@ function createLesson() {
           bufDesc.write(desc);
 
           const lessonObject = {
-            id: bufId.subarray(0, String(id).length).toString(),
-            title: bufTitle.subarray(0, title.length).toString(), //limit buffer to actual length of title
-            desc: bufDesc.subarray(0, desc.length).toString(),
-          };
+            id: byteRead(id, COL_ID),
+            title: byteRead(title, COL_TITLE),
+            desc: byteRead(desc, COL_DESC),
+          }
 
           appendLesson(lessonObject);
           console.log(`\nLesson Created`);
@@ -187,7 +195,7 @@ function editLesson() {
 }
 
 function updateList() {
-  rl.question("Enter lesson ID to edit: ", (id) => {
+rl.question("Enter lesson ID to edit: ", (id) => {
     if (!fs.existsSync(filePath)) {
       console.log("No Lessons Available");
       return showmenu();
@@ -220,6 +228,7 @@ function updateList() {
     rl.question("New Title : ", (newTitle) => {
       rl.question("New Description: ", (newDesc) => {
         const oldLesson = unpack(JSON.parse(lines[lessonIndex]));
+        
 
         bufId.fill(0);
         bufTitle.fill(0);
@@ -230,13 +239,9 @@ function updateList() {
         bufDesc.write(newDesc || oldLesson.desc);
 
         const updatedLesson = {
-          id: bufId.subarray(0, oldLesson.id.toString().length).toString(),
-          title: bufTitle
-            .subarray(0, (newTitle || oldLesson.title).length)
-            .toString(),
-          desc: bufDesc
-            .subarray(0, (newDesc || oldLesson.desc).length)
-            .toString(),
+          id: byteRead(oldLesson.id, COL_ID),
+          title: byteRead(newTitle || oldLesson.title, COL_TITLE),
+          desc: byteRead(newDesc || oldLesson.desc, COL_DESC),
         };
 
         lines[lessonIndex] = JSON.stringify(pack(updatedLesson));
