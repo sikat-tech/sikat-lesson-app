@@ -16,19 +16,19 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-function loadLessons() {
-  if (!fs.existsSync(filePath)) return [];
+// function loadLessons() {
+//   if (!fs.existsSync(filePath)) return [];
 
-  const lessons = [];
-  const stream = fs.createReadStream(filePath, "utf8");
-  const liner = readline.createInterface({ input: stream });
+//   const lessons = [];
+//   const stream = fs.createReadStream(filePath, "utf8");
+//   const liner = readline.createInterface({ input: stream });
 
-  liner.on("line", (line) => {
-    if (line.trim()) lessons.push(unpack(JSON.parse(line)));
-  });
+//   liner.on("line", (line) => {
+//     if (line.trim()) lessons.push(unpack(JSON.parse(line)));
+//   });
 
-  return lessons;
-}
+//   return lessons;
+// }
 
 // function saveLessons(lessons) {
 //   const lines =
@@ -38,6 +38,8 @@ function loadLessons() {
 //   fs.writeFileSync(filePath, lines, "utf8");
 // }
 
+
+///refractor 
 function appendLesson(lesson) {
   fs.appendFileSync(filePath, JSON.stringify(pack(lesson)) + "\n", "utf8");
 }
@@ -107,6 +109,7 @@ function showPage() {
       return showmenu();
     }
 
+    // Pagination Options
     const opts = [];
     if (hasNext) opts.push("N = Next");
     if (page > 0) opts.push("P = Prev");
