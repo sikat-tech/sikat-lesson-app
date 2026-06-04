@@ -30,13 +30,13 @@ function loadLessons() {
   return lessons;
 }
 
-function saveLessons(lessons) {
-  const lines =
-    lessons
-      .map((lessonObject) => JSON.stringify(pack(lessonObject)))
-      .join("\n") + "\n";
-  fs.writeFileSync(filePath, lines, "utf8");
-}
+// function saveLessons(lessons) {
+//   const lines =
+//     lessons
+//       .map((lessonObject) => JSON.stringify(pack(lessonObject)))
+//       .join("\n") + "\n";
+//   fs.writeFileSync(filePath, lines, "utf8");
+// }
 
 function appendLesson(lesson) {
   fs.appendFileSync(filePath, JSON.stringify(pack(lesson)) + "\n", "utf8");
