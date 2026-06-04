@@ -16,14 +16,23 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-function loadLessons() {
-  if (!fs.existsSync(filePath)) return [];
+// function loadLessons() {
+//   if (!fs.existsSync(filePath)) return [];
 
+//   const lessons = [];
+//   const stream = fs.createReadStream(filePath, "utf8");
+//   const liner = readline.createInterface({ input: stream });
+
+//   liner.on("line", (line) => {
+//     if (line.trim()) lessons.push(unpack(JSON.parse(line)));
+//   });
   const data = fs.readFileSync(filePath, "utf8").trim();
   if (!data) return [];
 
   return JSON.parse(data).map(unpack);
 }
+//   return lessons;
+// }
 
 <<<<<<< Updated upstream
 // function saveLessons(lessons) {
@@ -33,13 +42,9 @@ function loadLessons() {
 //       .join("\n") + "\n";
 //   fs.writeFileSync(filePath, lines, "utf8");
 // }
-=======
-function saveLessons(lessons) {
-  const packed = lessons.map(pack);
-  fs.writeFileSync(filePath, JSON.stringify(packed), "utf8");
-}
->>>>>>> Stashed changes
 
+
+///refractor 
 function appendLesson(lesson) {
   const lessons = loadLessons();
   lessons.push(lesson);
@@ -91,6 +96,7 @@ function showPage() {
     console.log(`${skip + i + 1}. ${l.title} - ${l.desc}`);
   });
 
+    // Pagination Options
   const opts = [];
   if (hasNext) opts.push("N = Next");
   if (page > 0) opts.push("P = Prev");
