@@ -149,9 +149,9 @@ function createLesson() {
 
 
           const lessonObject = {
-            id: bufId.toString().trim(),
-            title: bufTitle.toString().trim(),
-            desc: bufDesc.toString().trim(),
+            id: bufId.subarray(0,String(id).length).toString(),
+            title: bufTitle.subarray(0,title.length).toString(),
+            desc: bufDesc.subarray(0,desc.length).toString()
           }
 
           appendLesson(lessonObject);
