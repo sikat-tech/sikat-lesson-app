@@ -18,6 +18,7 @@ const allocCol = (size) => Buffer.alloc(size);
 const bufId = allocCol(12);
 const bufTitle = allocCol(50);
 const bufDesc = allocCol(256);
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -114,7 +115,7 @@ function showPage() {
 function getId(){
   if(!fs.existsSync(filePath)) return 1;
   const LessonContent = fs.readFileSync(filePath, "utf8");
-  const lines = LessonContent.trim().split("\n");
+  const lines = LessonContent.trim().split("\n").filter(Boolean);
   return lines.length + 1;
 }
 
@@ -123,8 +124,24 @@ function createLesson() {
     if (answer === "y") {
       rl.question("Lesson Title: ", (title) => {
         rl.question("Description: ", (desc) => {
-          const id = getId();
-          appendLesson({ id, title, desc });
+        const id = getId();
+
+          bufId.fill(0);
+          bufTitle.fill(0);
+          bufDesc.fill(0);
+
+          bufId.write(id.toString());
+          bufTitle.write(title);
+          bufDesc.write(desc);
+
+
+          const lessonObject = {
+            id: bufId.toString().trim(),
+            title: bufTitle.toString().trim(),
+            desc: bufDesc.toString().trim(),
+          }
+
+          appendLesson(lessonObject);
           console.log(`\nLesson Created`);
           showmenu();
         });
