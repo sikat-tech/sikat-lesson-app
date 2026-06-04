@@ -23,12 +23,6 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-///refractor
-function nextId() {
-  if (!fs.existsSync(filePath)) return 1;
-  const lines = fs.readFileSync(filePath, "utf8").trim().split("\n").filter(Boolean);
-  return lines.length + 1;
-}
 function appendLesson(lesson) {
   fs.appendFileSync(filePath, JSON.stringify(pack(lesson)) + "\n", "utf8");
 }
