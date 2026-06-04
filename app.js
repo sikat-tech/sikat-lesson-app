@@ -1,6 +1,6 @@
 const readline = require("readline");
 const fs = require("fs");
-const filePath = "lessons.json";
+const filePath = "lessons.ndjson";
 
 const pack = (lessonObject) => ({
   t: lessonObject.title,
@@ -26,15 +26,10 @@ const rl = readline.createInterface({
 //   liner.on("line", (line) => {
 //     if (line.trim()) lessons.push(unpack(JSON.parse(line)));
 //   });
-  const data = fs.readFileSync(filePath, "utf8").trim();
-  if (!data) return [];
 
-  return JSON.parse(data).map(unpack);
-}
 //   return lessons;
 // }
 
-<<<<<<< Updated upstream
 // function saveLessons(lessons) {
 //   const lines =
 //     lessons
@@ -46,9 +41,7 @@ const rl = readline.createInterface({
 
 ///refractor 
 function appendLesson(lesson) {
-  const lessons = loadLessons();
-  lessons.push(lesson);
-  saveLessons(lessons);
+  fs.appendFileSync(filePath, JSON.stringify(pack(lesson)) + "\n", "utf8");
 }
 
 function showmenu() {
@@ -80,37 +73,58 @@ function handleMenu(option) {
 let page = 0;
 
 function showPage() {
-  const lessons = loadLessons();
   const skip = page * 10;
-  const pageItems = lessons.slice(skip, skip + 10);
-  const hasNext = lessons.length > skip + 10;
+  let count = 0;
+  let shown = 0;
+  let hasNext = false;
+  let stopped = false;
+
+  const stream = fs.createReadStream(filePath, "utf8");
+  const liner = readline.createInterface({ input: stream });
 
   console.log(`\n--- Page ${page + 1} ---`);
 
-  if (pageItems.length === 0) {
-    console.log("No Lessons Available");
-    return showmenu();
-  }
+  liner.on("line", (line) => {
+    if (stopped || !line.trim()) return;
+    count++;
 
-  pageItems.forEach((l, i) => {
-    console.log(`${skip + i + 1}. ${l.title} - ${l.desc}`);
+    if (count <= skip) return;
+
+    if (shown >= 10) {
+      hasNext = true;
+      stopped = true;
+      liner.close();
+      stream.destroy();
+      return;
+    }
+
+    shown++;
+    const l = unpack(JSON.parse(line));
+    console.log(`${skip + shown}. ${l.title} - ${l.desc}`);
   });
 
-    // Pagination Options
-  const opts = [];
-  if (hasNext) opts.push("N = Next");
-  if (page > 0) opts.push("P = Prev");
-  opts.push("M = Menu");
+  liner.on("close", () => {
+    if (shown === 0) {
+      console.log("No Lessons Available");
+      return showmenu();
+    }
 
-  rl.question(`\n[${opts.join(" | ")}]: `, (ans) => {
-    const key = ans.toUpperCase();
-    if (key === "N" && hasNext) {
-      page++;
-      showPage();
-    } else if (key === "P" && page > 0) {
-      page--;
-      showPage();
-    } else showmenu();
+    // Pagination Options
+    const opts = [];
+    if (hasNext) opts.push("N = Next");
+    if (page > 0) opts.push("P = Prev");
+    opts.push("M = Menu");
+
+    rl.question(`\n[${opts.join(" | ")}]: `, (ans) => {
+      const key = ans.toUpperCase();
+      if (key === "N" && hasNext) {
+        page++;
+        showPage();
+      } else if (key === "P" && page > 0) {
+        page--;
+        showPage();
+      } else showmenu();
+    });
   });
 };
 
