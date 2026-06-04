@@ -16,29 +16,6 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-// function loadLessons() {
-//   if (!fs.existsSync(filePath)) return [];
-
-//   const lessons = [];
-//   const stream = fs.createReadStream(filePath, "utf8");
-//   const liner = readline.createInterface({ input: stream });
-
-//   liner.on("line", (line) => {
-//     if (line.trim()) lessons.push(unpack(JSON.parse(line)));
-//   });
-
-//   return lessons;
-// }
-
-// function saveLessons(lessons) {
-//   const lines =
-//     lessons
-//       .map((lessonObject) => JSON.stringify(pack(lessonObject)))
-//       .join("\n") + "\n";
-//   fs.writeFileSync(filePath, lines, "utf8");
-// }
-
-
 ///refractor 
 function appendLesson(lesson) {
   fs.appendFileSync(filePath, JSON.stringify(pack(lesson)) + "\n", "utf8");
