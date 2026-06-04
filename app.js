@@ -136,7 +136,7 @@ function getId(){
 
 function createLesson() {
   rl.question("Do you want to create a new lesson? (Y/N): ", (answer) => {
-    if (answer === "y") {
+    if (answer.toLowerCase() === "y") {
       rl.question("Lesson Title: ", (title) => {
         rl.question("Description: ", (desc) => {
         const id = getId();
@@ -203,7 +203,7 @@ function updateList() {
     // for each loop displaying lesson
     for (let i = 0; i < lines.length; i++) {
       const lesson = unpack(JSON.parse(lines[i]));
-      if (lesson.id === parseInt(id)) {
+      if (String(lesson.id) === String(parseInt(id))) {
         found = true;
         lessonIndex = i;
         console.log(`\nCurrent: [${lesson.id}] ${lesson.title} - ${lesson.desc}`);
