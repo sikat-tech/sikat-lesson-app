@@ -111,12 +111,19 @@ function showPage() {
   });
 };
 
+function getId(){
+  if(!fs.existsSync(filePath)) return 1;
+  const LessonContent = fs.readFileSync(filePath, "utf8");
+  const lines = LessonContent.trim().split("\n");
+  return lines.length + 1;
+}
+
 function createLesson() {
   rl.question("Do you want to create a new lesson? (Y/N): ", (answer) => {
     if (answer === "y") {
       rl.question("Lesson Title: ", (title) => {
         rl.question("Description: ", (desc) => {
-          const id = nextId();
+          const id = getId();
           appendLesson({ id, title, desc });
           console.log(`\nLesson Created`);
           showmenu();
