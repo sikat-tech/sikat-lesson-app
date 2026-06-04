@@ -15,8 +15,8 @@ const unpack = (lessonObject) => ({
 
 const allocCol = (size) => Buffer.alloc(size);
 
-const bufId = allocCol(64);
-const bufTitle = allocCol(128);
+const bufId = allocCol(12);
+const bufTitle = allocCol(50);
 const bufDesc = allocCol(256);
 const rl = readline.createInterface({
   input: process.stdin,
@@ -118,6 +118,7 @@ function createLesson() {
         rl.question("Description: ", (desc) => {
           const id = nextId();
           appendLesson({ id, title, desc });
+          console.log(`\nLesson Created`);
           showmenu();
         });
       });
