@@ -44,7 +44,7 @@ function handleMenu(option) {
   } else if (option === "2") {
     viewLesson();
   } else if (option === "3") {
-    editLesson();
+    editLesson() ;
   } else if (option === "4") {
     console.log("Goodbye!");
     rl.close();
@@ -56,7 +56,7 @@ function handleMenu(option) {
 
 let page = 0;
 
-function showPage() {
+function showPage(mode = "view") {
   const skip = page * 10;
   let count = 0;
   let shown = 0;
@@ -97,17 +97,30 @@ function showPage() {
     const opts = [];
     if (hasNext) opts.push("N = Next");
     if (page > 0) opts.push("P = Prev");
+    if (mode === "edit") opts.push("E = Edit");
+    if (mode === "edit") opts.push("C = CloseList");
     opts.push("M = Menu");
 
     rl.question(`\n[${opts.join(" | ")}]: `, (ans) => {
       const key = ans.toUpperCase();
-      if (key === "N" && hasNext) {
-        page++;
-        showPage();
-      } else if (key === "P" && page > 0) {
-        page--;
-        showPage();
-      } else showmenu();
+
+      if (key.toUpperCase() === "N") {page++; showPage(mode);}
+      else if (key.toUpperCase()  === "P" && page > 0) {page--; showPage(mode);}
+      else if (key.toUpperCase() === "E" && mode === "edit") {updateList();}
+      else if (key.toUpperCase() === "C" && mode === "edit") {showMenu();}
+      else if (key.toUpperCase() === "M") {showmenu();}
+      else {
+        console.log("Invalid Option");
+        showmenu();
+      }
+
+      // if (key === "N" && hasNext) {
+      //   page++;
+      //   showPage();
+      // } else if (key === "P" && page > 0) {
+      //   page--;
+      //   showPage();
+      // } else showmenu();
     });
   });
 };
@@ -159,37 +172,60 @@ function viewLesson() {
     return showmenu();
   }
 
-  showPage();
+  showPage("view");
 }
 
-function editLesson() {
-  if (lesson.length === 0) {
-    console.log("No lessons to edit.");
+
+function editLesson() 
+{ 
+
+  if (!fs.existsSync(filePath)) {
+    console.log("No Lessons Available");
     return showmenu();
+
   }
+showPage("edit");
+}
 
-  console.log("\nSelect lesson to edit:\n");
-
-  lesson.forEach((l, i) => {
-    console.log(`${i + 1}. ${l.title}`);
-  });
-
-  rl.question("\nEnter number: ", (num) => {
-    const index = parseInt(num) - 1;
-
-    if (index < 0 || index >= lesson.length) {
-      console.log("Invalid selection");
+function updateList() {
+  rl.question("Enter lesson ID to edit: ", (id) => {
+    if (!fs.existsSync(filePath)) {
+      console.log("No Lessons Available");
       return showmenu();
     }
 
-    rl.question("New Title: ", (newTitle) => {
+    const content = fs.readFileSync(filePath, "utf8");
+    const lines = content.trim().split("\n");
+    let found = false;
+    let lessonIndex = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      const lesson = unpack(JSON.parse(lines[i]));
+      if (lesson.id === parseInt(id)) {
+        found = true;
+        lessonIndex = i;
+        console.log(`\nCurrent: [${lesson.id}] ${lesson.title} - ${lesson.desc}`);
+        break;
+      }
+    }
+
+    if (!found) {
+      console.log("Lesson not found.");
+      return showmenu();
+    }
+
+    rl.question("New Title : ", (newTitle) => {
       rl.question("New Description: ", (newDesc) => {
-        lesson[index].title = newTitle;
-        lesson[index].desc = newDesc;
+        const oldLesson = unpack(JSON.parse(lines[lessonIndex]));
+        const updatedLesson = {
+          id: oldLesson.id,
+          title: newTitle || oldLesson.title,
+          desc: newDesc || oldLesson.desc,
+        };
 
-        saveLesson();
-
-        console.log("\nLesson Updated!");
+        lines[lessonIndex] = JSON.stringify(pack(updatedLesson));
+        fs.writeFileSync(filePath, lines.join("\n") + "\n", "utf8");
+        console.log("Lesson Updated");
         showmenu();
       });
     });
