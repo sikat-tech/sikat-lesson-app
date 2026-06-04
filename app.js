@@ -25,9 +25,11 @@ const rl = readline.createInterface({
 });
 
 function appendLesson(lesson) {
-  fs.appendFileSync(filePath, JSON.stringify(pack(lesson)) + "\n", //convert lesson object para pack format and append to file. 
-    "utf8" // used utf8 kasi mostly english characters
-  ); 
+  fs.appendFileSync(
+    filePath,
+    JSON.stringify(pack(lesson)) + "\n", //convert lesson object para pack format and append to file.
+    "utf8", // used utf8 kasi mostly english characters
+  );
 }
 
 function showmenu() {
@@ -46,7 +48,7 @@ function handleMenu(option) {
   } else if (option === "2") {
     viewLesson();
   } else if (option === "3") {
-    editLesson() ;
+    editLesson();
   } else if (option === "4") {
     console.log("Goodbye!");
     rl.close();
@@ -65,12 +67,12 @@ function showPage(mode = "view") {
   let hasNext = false;
   let stopped = false;
 
-  const stream = fs.createReadStream(filePath, "utf8");
-  const liner = readline.createInterface({ input: stream });
+  const readcontentstream = fs.createReadStream(filePath, "utf8");
+  const getLiner = readline.createInterface({ input: readcontentstream });
 
   console.log(`\n--- Page ${page + 1} ---`);
 
-  liner.on("line", (line) => {
+  getLiner.on("line", (line) => {
     if (stopped || !line.trim()) return;
     count++;
 
@@ -79,8 +81,8 @@ function showPage(mode = "view") {
     if (shown >= 10) {
       hasNext = true;
       stopped = true;
-      liner.close();
-      stream.destroy();
+      getLiner.close();
+      readcontentstream.destroy();
       return;
     }
 
@@ -89,7 +91,7 @@ function showPage(mode = "view") {
     console.log(`${skip + shown}. [id:${l.id}] ${l.title} - ${l.desc}`);
   });
 
-  liner.on("close", () => {
+  getLiner.on("close", () => {
     if (shown === 0) {
       console.log("No Lessons Available");
       return showmenu();
@@ -106,30 +108,29 @@ function showPage(mode = "view") {
     rl.question(`\n[${opts.join(" | ")}]: `, (ans) => {
       const key = ans.toUpperCase();
 
-      if (key.toUpperCase() === "N") {page++; showPage(mode);}
-      else if (key.toUpperCase()  === "P" && page > 0) {page--; showPage(mode);}
-      else if (key.toUpperCase() === "E" && mode === "edit") {updateList();}
-      else if (key.toUpperCase() === "C" && mode === "edit") {showMenu();}
-      else if (key.toUpperCase() === "M") {showmenu();}
-      else {
+      if (key.toUpperCase() === "N") {
+        page++;
+        showPage(mode);
+      } else if (key.toUpperCase() === "P" && page > 0) {
+        page--;
+        showPage(mode);
+      } else if (key.toUpperCase() === "E" && mode === "edit") {
+        updateList();
+      } else if (key.toUpperCase() === "C" && mode === "edit") {
+        showMenu();
+      } else if (key.toUpperCase() === "M") {
+        showMenu();
+      } else {
         console.log("Invalid Option");
         showmenu();
       }
-
-      // if (key === "N" && hasNext) {
-      //   page++;
-      //   showPage();
-      // } else if (key === "P" && page > 0) {
-      //   page--;
-      //   showPage();
-      // } else showmenu();
     });
   });
-};
+}
 
-function getId(){
-  if(!fs.existsSync(filePath)) return 1;
-  const LessonContent = fs.createReadStream(filePath, "utf8");
+function getId() {
+  if (!fs.existsSync(filePath)) return 1;
+  const LessonContent = fs.readFileSync(filePath, "utf8");
   const lines = LessonContent.trim().split("\n").filter(Boolean);
   return lines.length + 1;
 }
@@ -139,7 +140,7 @@ function createLesson() {
     if (answer.toLowerCase() === "y") {
       rl.question("Lesson Title: ", (title) => {
         rl.question("Description: ", (desc) => {
-        const id = getId();
+          const id = getId();
 
           // added fill to cleanup yung previous data sa buffer bago gumawa bago
           bufId.fill(0);
@@ -151,12 +152,11 @@ function createLesson() {
           bufTitle.write(title);
           bufDesc.write(desc);
 
-
           const lessonObject = {
-            id: bufId.subarray(0,String(id).length).toString(), 
-            title: bufTitle.subarray(0,title.length).toString(), //limit buffer to actual length of title
-            desc: bufDesc.subarray(0,desc.length).toString()
-          }
+            id: bufId.subarray(0, String(id).length).toString(),
+            title: bufTitle.subarray(0, title.length).toString(), //limit buffer to actual length of title
+            desc: bufDesc.subarray(0, desc.length).toString(),
+          };
 
           appendLesson(lessonObject);
           console.log(`\nLesson Created`);
@@ -168,24 +168,22 @@ function createLesson() {
       showmenu();
     }
   });
-};
+}
 
 function viewLesson() {
   if (!fs.existsSync(filePath)) {
     console.log("No Lessons Available");
     return showmenu();
   }
-
   showPage("view");
 }
 
-function editLesson() 
-{ 
+function editLesson() {
   if (!fs.existsSync(filePath)) {
     console.log("No Lessons Available");
     return showmenu();
   }
-showPage("edit");
+  showPage("edit");
 }
 
 function updateList() {
@@ -195,8 +193,8 @@ function updateList() {
       return showmenu();
     }
 
-    const content = fs.readFileSync(filePath, "utf8");
-    const lines = content.trim().split("\n");
+    const readFileContent = fs.readFileSync(filePath, "utf8");
+    const lines = readFileContent.trim().split("\n");
     let found = false;
     let lessonIndex = -1;
 
@@ -206,7 +204,9 @@ function updateList() {
       if (String(lesson.id) === String(parseInt(id))) {
         found = true;
         lessonIndex = i;
-        console.log(`\nCurrent: [${lesson.id}] ${lesson.title} - ${lesson.desc}`);
+        console.log(
+          `\nCurrent: [${lesson.id}] ${lesson.title} - ${lesson.desc}`,
+        );
         break;
       }
     }
@@ -220,7 +220,7 @@ function updateList() {
     rl.question("New Title : ", (newTitle) => {
       rl.question("New Description: ", (newDesc) => {
         const oldLesson = unpack(JSON.parse(lines[lessonIndex]));
-        
+
         bufId.fill(0);
         bufTitle.fill(0);
         bufDesc.fill(0);
@@ -231,8 +231,12 @@ function updateList() {
 
         const updatedLesson = {
           id: bufId.subarray(0, oldLesson.id.toString().length).toString(),
-          title: bufTitle.subarray(0, (newTitle || oldLesson.title).length).toString(),
-          desc: bufDesc.subarray(0, (newDesc || oldLesson.desc).length).toString(),
+          title: bufTitle
+            .subarray(0, (newTitle || oldLesson.title).length)
+            .toString(),
+          desc: bufDesc
+            .subarray(0, (newDesc || oldLesson.desc).length)
+            .toString(),
         };
 
         lines[lessonIndex] = JSON.stringify(pack(updatedLesson));
