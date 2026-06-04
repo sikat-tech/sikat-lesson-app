@@ -175,14 +175,11 @@ function viewLesson() {
   showPage("view");
 }
 
-
 function editLesson() 
 { 
-
   if (!fs.existsSync(filePath)) {
     console.log("No Lessons Available");
     return showmenu();
-
   }
 showPage("edit");
 }
@@ -199,6 +196,7 @@ function updateList() {
     let found = false;
     let lessonIndex = -1;
 
+    // for each loop displaying lesson
     for (let i = 0; i < lines.length; i++) {
       const lesson = unpack(JSON.parse(lines[i]));
       if (lesson.id === parseInt(id)) {
@@ -214,13 +212,23 @@ function updateList() {
       return showmenu();
     }
 
+    // Ask for new title and description
     rl.question("New Title : ", (newTitle) => {
       rl.question("New Description: ", (newDesc) => {
         const oldLesson = unpack(JSON.parse(lines[lessonIndex]));
+        
+        bufId.fill(0);
+        bufTitle.fill(0);
+        bufDesc.fill(0);
+
+        bufId.write(oldLesson.id.toString());
+        bufTitle.write(newTitle || oldLesson.title);
+        bufDesc.write(newDesc || oldLesson.desc);
+
         const updatedLesson = {
-          id: oldLesson.id,
-          title: newTitle || oldLesson.title,
-          desc: newDesc || oldLesson.desc,
+          id: bufId.subarray(0, oldLesson.id.toString().length).toString(),
+          title: bufTitle.subarray(0, (newTitle || oldLesson.title).length).toString(),
+          desc: bufDesc.subarray(0, (newDesc || oldLesson.desc).length).toString(),
         };
 
         lines[lessonIndex] = JSON.stringify(pack(updatedLesson));
