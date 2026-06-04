@@ -3,12 +3,12 @@ const fs = require("fs");
 const filePath = "lessons.ndjson";
 
 const pack = (lessonObject) => ({
-  id: lessonObject.id,
+  i: lessonObject.id,
   t: lessonObject.title,
   d: lessonObject.desc,
 });
 const unpack = (lessonObject) => ({
-  id: lessonObject.id,
+  id: lessonObject.i,
   title: lessonObject.t,
   desc: lessonObject.d,
 });
@@ -25,7 +25,9 @@ const rl = readline.createInterface({
 });
 
 function appendLesson(lesson) {
-  fs.appendFileSync(filePath, JSON.stringify(pack(lesson)) + "\n", "utf8");
+  fs.appendFileSync(filePath, JSON.stringify(pack(lesson)) + "\n", //convert lesson object para pack format and append to file. 
+    "utf8" // used utf8 kasi mostly english characters
+  ); 
 }
 
 function showmenu() {
@@ -127,7 +129,7 @@ function showPage(mode = "view") {
 
 function getId(){
   if(!fs.existsSync(filePath)) return 1;
-  const LessonContent = fs.readFileSync(filePath, "utf8");
+  const LessonContent = fs.createReadStream(filePath, "utf8");
   const lines = LessonContent.trim().split("\n").filter(Boolean);
   return lines.length + 1;
 }
@@ -139,18 +141,20 @@ function createLesson() {
         rl.question("Description: ", (desc) => {
         const id = getId();
 
+          // added fill to cleanup yung previous data sa buffer bago gumawa bago
           bufId.fill(0);
           bufTitle.fill(0);
           bufDesc.fill(0);
 
+          //to input sa mismong buffer
           bufId.write(id.toString());
           bufTitle.write(title);
           bufDesc.write(desc);
 
 
           const lessonObject = {
-            id: bufId.subarray(0,String(id).length).toString(),
-            title: bufTitle.subarray(0,title.length).toString(),
+            id: bufId.subarray(0,String(id).length).toString(), 
+            title: bufTitle.subarray(0,title.length).toString(), //limit buffer to actual length of title
             desc: bufDesc.subarray(0,desc.length).toString()
           }
 
