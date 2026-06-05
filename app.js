@@ -16,10 +16,7 @@ const unpack = (lessonObject) => ({
 const COL_ID = 12;
 const COL_TITLE = 50;
 const COL_DESC = 256;
-
-const bufPageLimit = Buffer.alloc(1);
-bufPageLimit.writeUInt8(10);
-const PAGE_LIMIT = bufPageLimit.readUInt8(0);
+const PAGE_LIMIT = 10;
 
 const byteRead = (value, size) => {
   const buf = Buffer.alloc(size);
