@@ -66,6 +66,12 @@ function handleMenu(option) {
 
 let page = 0;
 
+
+
+/// Dito refrator kopa ito
+// add ako ng stream.pause at stream.resume para hindi na magbasa ng sobra sa page limit, 
+// kasi dati nagbabasa ng buong file tapos lang pinapakita yung page limit, so mas efficient na ito kasi hindi na magbasa ng sobra sa page limit.
+
 function showPage(mode = "view") {
   const skipPage = page * 10;
   let count = 0;
@@ -80,7 +86,8 @@ function showPage(mode = "view") {
 
 
   getLiner.on("line", (line) => {
-    if (stopped || !line.trim()) return; // skip empty lines and stop if already reached page limit
+    
+    if (stopped || !line.trim()) return; 
     count++;
 
     if (count <= skipPage) return; 
