@@ -1,4 +1,4 @@
-const fs = require("fs/promises");
+const fs = require("fs");
 const readline = require("readline");
 const { stdin: input, stdout: output } = require("process");
 
@@ -8,8 +8,19 @@ let saveLesson = [];
 
 const rl = readline.createInterface({ input, output });
 
+const IdSize = 10;
+const TitleSize = 50;
+const DescSize = 100;
+/// total bytes = 155
+
+function insertBuffer(colValue, bufferSized) {
+  const buffer = Buffer.alloc(bufferSized);
+  buffer.write(String(colValue), "utf-8");
+  return buffer.subarray(0, colValue.length).toString();
+}
+
 function insertLesson(saveLesson) {
-    fs.appendFile(filePath, JSON.stringify(saveLesson) + '\n');
+  fs.appendFile(filePath, JSON.stringify(saveLesson) + "\n");
 }
 
 function showMenu(answer) {
@@ -19,7 +30,7 @@ function showMenu(answer) {
   console.log("3. Edit Lesson");
   console.log("4. Delete Lesson");
   console.log("5. Exit");
-
+  
   rl.question("Choose an options:", handleOptions);
 }
 
@@ -36,8 +47,18 @@ function handleOptions(answer) {
     console.log("Maliii puu");
     showMenu();
     console.log(saveLesson);
+
     rl.close();
   }
+}
+
+function getId() {
+  if (!fs.existsSync(filePath)) return 1;
+  const convertData = JSON.parse(filePath, "utf-8");
+  const lastId = convertData.length -1 
+
+  console.log(lastId);
+  
 }
 
 function createLesson() {
@@ -46,23 +67,22 @@ function createLesson() {
       rl.question("Enter lesson title: ", (title) => {
         rl.question("Enter lesson description: ", (description) => {
           saveLesson.push({
-            title: title,
-            description: description,
+            title: insertBuffer(title, TitleSize),
+            description: insertBuffer(description, DescSize),
           });
 
           insertLesson(saveLesson);
+          console.log("matagumpay ka idol");
         });
       });
     } else {
-      console.log("Lesson creation cancelled.");
+      console.log("Bakit mo naman kinacel?");
       showMenu();
     }
   });
 }
 
-function viewLesson() {
-  console.log("Viewing lesson...");
-}
+function viewLesson() {}
 
 function editLesson() {
   console.log("Editing lesson...");
@@ -73,3 +93,4 @@ function deleteLesson() {
 }
 
 showMenu();
+getId();
