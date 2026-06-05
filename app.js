@@ -1,5 +1,6 @@
 const readline = require("readline");
 const fs = require("fs");
+const fsp = require("fs/promises");
 const filePath = "lessons.ndjson";
 
 const pack = (lessonObject) => ({
@@ -17,11 +18,10 @@ const COL_ID = 12;
 const COL_TITLE = 50;
 const COL_DESC = 256;
 
-
 // Nag declare buffer for global use
 const byteRead = (value, size) => {
   const buf = Buffer.alloc(size);
-  buf.write(String(value), 'utf8');
+  buf.write(String(value), "utf8");
   return buf.subarray(0, String(value).length).toString();
 };
 
@@ -66,10 +66,8 @@ function handleMenu(option) {
 
 let page = 0;
 
-
-
 /// Dito refrator kopa ito
-// add ako ng stream.pause at stream.resume para hindi na magbasa ng sobra sa page limit, 
+// add ako ng stream.pause at stream.resume para hindi na magbasa ng sobra sa page limit,
 // kasi dati nagbabasa ng buong file tapos lang pinapakita yung page limit, so mas efficient na ito kasi hindi na magbasa ng sobra sa page limit.
 
 function showPage(mode = "view") {
@@ -84,13 +82,11 @@ function showPage(mode = "view") {
 
   console.log(`\n--- Page ${page + 1} ---`);
 
-
   getLiner.on("line", (line) => {
-    
-    if (stopped || !line.trim()) return; 
+    if (stopped || !line.trim()) return;
     count++;
 
-    if (count <= skipPage) return; 
+    if (count <= skipPage) return;
 
     if (shown >= 10) {
       hasNext = true;
@@ -143,11 +139,41 @@ function showPage(mode = "view") {
 }
 
 // need to refractor para hindi na kailangan magbasa ng buong file para malaman yung id, instead read last line lang para malaman yung last id then add 1.
-function getId() {
-  if (!fs.existsSync(filePath)) return 1;
-  const LessonContent = fs.readFileSync(filePath, "utf8");
-  const lines = LessonContent.trim().split("\n").filter(Boolean);
-  return lines.length + 1;
+async function getId() {
+  // if (!fs.existsSync(filePath)) return 1;
+  // const LessonContent = fs.readFileSync(filePath, "utf8");
+  // const lines = LessonContent.trim().split("\n").filter(Boolean);
+  // return lines.length + 1;
+
+
+  try {
+    const fs =  fs.open(filePath, "r"); // "r" for read mode flag
+    try {
+      const stats = file.stat(); // para malaman yung size ng file (ndjson)
+
+      if (stats.size === 0) {
+        return 1;
+      } // if file is empty, return 1 as the first id
+
+      const chunkSize = Math.min(1024, stats.size); // read 1kb or less
+      const buffer = Buffer.alloc(chunkSize); // allocate buffer for chunk size lang para ma read yung last
+
+      fs.read(file, buffer, 0, chunkSize, stats.size - chunkSize); // read last chunk of file para ma get yung last line
+
+      const data = buffer.toString("utf8"); // convert buffer to string para ma process sa next line
+
+      const line = data.trim().split("\n").slice(-1)[0]; // get last line of file
+
+      const lastLesson = unpack(JSON.parse(line)); // convert last line to lesson object para ma get yung last id
+
+      return Number(lastlesson.id) + 1; // add 1 to last id for new id
+      
+    } finally {
+       file.close();
+    }
+  } catch (err) {
+    console.error("Error reading file:", err);
+  }
 }
 
 function createLesson() {
