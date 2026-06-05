@@ -16,11 +16,12 @@ const unpack = (lessonObject) => ({
 const COL_ID = 12;
 const COL_TITLE = 50;
 const COL_DESC = 256;
-const PAGE_LIMIT = 10;
 
+
+// Nag declare buffer for global use
 const byteRead = (value, size) => {
   const buf = Buffer.alloc(size);
-  buf.write(String(value));
+  buf.write(String(value), 'utf8');
   return buf.subarray(0, String(value).length).toString();
 };
 
@@ -66,34 +67,35 @@ function handleMenu(option) {
 let page = 0;
 
 function showPage(mode = "view") {
-  const skip = page * PAGE_LIMIT;
+  const skipPage = page * 10;
   let count = 0;
   let shown = 0;
   let hasNext = false;
   let stopped = false;
 
-  const readcontentstream = fs.createReadStream(filePath, "utf8");
-  const getLiner = readline.createInterface({ input: readcontentstream });
+  const readcontentstream = fs.createReadStream(filePath, "utf8"); // Read file in chunk
+  const getLiner = readline.createInterface({ input: readcontentstream }); // get per page from stream
 
   console.log(`\n--- Page ${page + 1} ---`);
 
+
   getLiner.on("line", (line) => {
-    if (stopped || !line.trim()) return;
+    if (stopped || !line.trim()) return; // skip empty lines and stop if already reached page limit
     count++;
 
-    if (count <= skip) return;
+    if (count <= skipPage) return; 
 
-    if (shown >= PAGE_LIMIT) {
+    if (shown >= 10) {
       hasNext = true;
       stopped = true;
       getLiner.close();
-      readcontentstream.destroy();
-      return;
+      readcontentstream.destroy(); //destroy stream para hindi na magbasa ng sobra sa page limit
+      return; //return para hindi na magprocess ng sobra sa page limit
     }
 
     shown++;
-    const l = unpack(JSON.parse(line));
-    console.log(`${skip + shown}. [id:${l.id}] ${l.title} - ${l.desc}`);
+    const l = unpack(JSON.parse(line)); // convert line to lesson object para ma display sa console
+    console.log(`${skipPage + shown}. [id:${l.id}] ${l.title} - ${l.desc}`);
   });
 
   getLiner.on("close", () => {
@@ -133,6 +135,7 @@ function showPage(mode = "view") {
   });
 }
 
+// need to refractor para hindi na kailangan magbasa ng buong file para malaman yung id, instead read last line lang para malaman yung last id then add 1.
 function getId() {
   if (!fs.existsSync(filePath)) return 1;
   const LessonContent = fs.readFileSync(filePath, "utf8");
