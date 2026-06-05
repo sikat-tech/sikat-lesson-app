@@ -1,4 +1,4 @@
-const fs = require("fs");
+const fs = require("fs/promises");
 const readline = require("readline");
 const { stdin: input, stdout: output } = require("process");
 
@@ -30,7 +30,6 @@ function showMenu(answer) {
   console.log("3. Edit Lesson");
   console.log("4. Delete Lesson");
   console.log("5. Exit");
-  
   rl.question("Choose an options:", handleOptions);
 }
 
@@ -47,18 +46,32 @@ function handleOptions(answer) {
     console.log("Maliii puu");
     showMenu();
     console.log(saveLesson);
-
     rl.close();
   }
 }
 
 function getId() {
-  if (!fs.existsSync(filePath)) return 1;
-  const convertData = JSON.parse(filePath, "utf-8");
-  const lastId = convertData.length -1 
+  const totalLength = 155;
+  const startPosition = 0;
 
-  console.log(lastId);
-  
+  fs.open(filePath, "r'", function (err, fd) {
+    if (err) {
+      return console.error(err);
+    }
+
+   
+    const lastRecordOffset = 
+    
+
+    fs.statfsync(filePath, function (err, stats) {
+      if (err) {
+        return console.error(err);
+      }
+
+      fs.readFile(filePath, )
+
+    });
+  });
 }
 
 function createLesson() {
@@ -93,4 +106,3 @@ function deleteLesson() {
 }
 
 showMenu();
-getId();
