@@ -1,18 +1,6 @@
 const readline = require("readline");
 const fs = require("fs");
-const fsp = require("fs/promises");
 const filePath = "lessons.ndjson";
-
-const pack = (lessonObject) => ({
-  i: lessonObject.id,
-  t: lessonObject.title,
-  d: lessonObject.desc,
-});
-const unpack = (lessonObject) => ({
-  id: lessonObject.i,
-  title: lessonObject.t,
-  desc: lessonObject.d,
-});
 
 const COL_ID = 12;
 const COL_TITLE = 50;
@@ -33,7 +21,7 @@ const rl = readline.createInterface({
 function appendLesson(lesson) {
   fs.appendFileSync(
     filePath,
-    JSON.stringify(pack(lesson)) + "\n", //convert lesson object para pack format and append to file.
+    JSON.stringify(lesson) + "\n", //convert lesson object to JSON and append to file.
     "utf8", // used utf8 kasi mostly english characters
   );
 }
@@ -43,7 +31,8 @@ function showmenu() {
   console.log("1. Create Lesson");
   console.log("2. View Lesson");
   console.log("3. Edit Lesson");
-  console.log("4. Exit");
+  console.log("4. Delete Lesson");
+  console.log("5. Exit");
 
   rl.question("Choose an option: ", handleMenu);
 }
@@ -56,6 +45,8 @@ function handleMenu(option) {
   } else if (option === "3") {
     editLesson();
   } else if (option === "4") {
+    deleteLesson();
+  } else if (option === "5") {
     console.log("Goodbye!");
     rl.close();
   } else {
@@ -64,115 +55,29 @@ function handleMenu(option) {
   }
 }
 
-let page = 0;
-
-/// Dito refrator kopa ito
-// add ako ng stream.pause at stream.resume para hindi na magbasa ng sobra sa page limit,
-// kasi dati nagbabasa ng buong file tapos lang pinapakita yung page limit, so mas efficient na ito kasi hindi na magbasa ng sobra sa page limit.
-
-function showPage(mode = "view") {
-  const skipPage = page * 10;
-  let count = 0;
-  let shown = 0;
-  let hasNext = false;
-  let stopped = false;
-
-  const readcontentstream = fs.createReadStream(filePath, "utf8"); // Read file in chunk
-  const getLiner = readline.createInterface({ input: readcontentstream }); // get per page from stream
-
-  console.log(`\n--- Page ${page + 1} ---`);
-
-  getLiner.on("line", (line) => {
-    if (stopped || !line.trim()) return;
-    count++;
-
-    if (count <= skipPage) return;
-
-    if (shown >= 10) {
-      hasNext = true;
-      stopped = true;
-      getLiner.close();
-      readcontentstream.destroy(); //destroy stream para hindi na magbasa ng sobra sa page limit
-      return; //return para hindi na magprocess ng sobra sa page limit
-    }
-
-    shown++;
-    const l = unpack(JSON.parse(line)); // convert line to lesson object para ma display sa console
-    console.log(`${skipPage + shown}. [id:${l.id}] ${l.title} - ${l.desc}`);
-  });
-
-  getLiner.on("close", () => {
-    if (shown === 0) {
-      console.log("No Lessons Available");
-      return showmenu();
-    }
-
-    // Pagination Options
-    const opts = [];
-    if (hasNext) opts.push("N = Next");
-    if (page > 0) opts.push("P = Prev");
-    if (mode === "edit") opts.push("E = Edit");
-    if (mode === "edit") opts.push("C = CloseList");
-    opts.push("M = Menu");
-
-    rl.question(`\n[${opts.join(" | ")}]: `, (ans) => {
-      const key = ans.toLowerCase();
-
-      if (key === "N") {
-        page++;
-        showPage(mode);
-      } else if (key === "P" && page > 0) {
-        page--;
-        showPage(mode);
-      } else if (key === "E" && mode === "edit") {
-        updateList();
-      } else if (key === "C" && mode === "edit") {
-        showmenu();
-      } else if (key === "M") {
-        showmenu();
-      } else {
-        console.log("Invalid Option");
-        showmenu();
-      }
-    });
-  });
-}
-
-// need to refractor para hindi na kailangan magbasa ng buong file para malaman yung id, instead read last line lang para malaman yung last id then add 1.
-async function getId() {
-  // if (!fs.existsSync(filePath)) return 1;
-  // const LessonContent = fs.readFileSync(filePath, "utf8");
-  // const lines = LessonContent.trim().split("\n").filter(Boolean);
-  // return lines.length + 1;
-
-
+function getId() {
   try {
-    const fs =  fs.open(filePath, "r"); // "r" for read mode flag
-    try {
-      const stats = file.stat(); // para malaman yung size ng file (ndjson)
-
-      if (stats.size === 0) {
-        return 1;
-      } // if file is empty, return 1 as the first id
-
-      const chunkSize = Math.min(1024, stats.size); // read 1kb or less
-      const buffer = Buffer.alloc(chunkSize); // allocate buffer for chunk size lang para ma read yung last
-
-      fs.read(file, buffer, 0, chunkSize, stats.size - chunkSize); // read last chunk of file para ma get yung last line
-
-      const data = buffer.toString("utf8"); // convert buffer to string para ma process sa next line
-
-      const line = data.trim().split("\n").slice(-1)[0]; // get last line of file
-
-      const lastLesson = unpack(JSON.parse(line)); // convert last line to lesson object para ma get yung last id
-
-      return Number(lastlesson.id) + 1; // add 1 to last id for new id
-      
-    } finally {
-       file.close();
+    if (!fs.existsSync(filePath)) {
+      return 1;
     }
+
+    const content = fs.readFileSync(filePath, "utf8");
+    const lines = content
+      .trim()
+      .split("\n")
+      .filter((line) => line.trim());
+
+    if (lines.length === 0) {
+      return 1;
+    }
+
+    const lastLine = lines[lines.length - 1];
+    const lastLesson = JSON.parse(lastLine);
+
+    return Number(lastLesson.id) + 1;
   } catch (err) {
     console.error("Error reading file:", err);
+    return 1;
   }
 }
 
@@ -182,16 +87,6 @@ function createLesson() {
       rl.question("Lesson Title: ", (title) => {
         rl.question("Description: ", (desc) => {
           const id = getId();
-
-          // // added fill to cleanup yung previous data sa buffer bago gumawa bago
-          // bufId.fill(0);
-          // bufTitle.fill(0);
-          // bufDesc.fill(0);
-
-          // //to input sa mismong buffer
-          // bufId.write(id.toString());
-          // bufTitle.write(title);
-          // bufDesc.write(desc);
 
           const lessonObject = {
             id: byteRead(id, COL_ID),
@@ -209,6 +104,127 @@ function createLesson() {
       showmenu();
     }
   });
+}
+
+let page = 0;
+
+function showPage(mode = "view") {
+  // ===== SETUP =====
+  const itemsPerPage = 10;
+  const linesToSkip = page * itemsPerPage; // How many lines to skip
+
+  try {
+    if (!fs.existsSync(filePath)) {
+      console.log("No Lessons Available");
+      return showmenu();
+    }
+
+    // ===== FIND WHERE PAGE DATA STARTS & ENDS =====
+    const fd = fs.openSync(filePath, "r");
+    let currentByte = 0; //store byte for pagestartbyte and pageendbyte
+    let currentLineNumber = 0; //used for reference to get the line
+    let pageStartByte = -1; //start to 1 kasi wala naman byte na = 1
+    let pageEndByte = -1; //start to 1 kasi wala naman byte na = 1
+
+    // Scan file in 50-byte chunks, looking for newlines
+    while (true) {
+      const chunk = Buffer.alloc(50);
+      const bytesRead = fs.readSync(fd, chunk, 0, 50, currentByte);
+      if (bytesRead === 0) break; // Reached end of file
+
+      // Check each byte for newline character
+      for (let i = 0; i < bytesRead; i++) {
+        if (chunk[i] === 10) {
+          // 10 is newline character in ASCII
+          currentLineNumber++;
+
+          // check what line is being counted
+          if (currentLineNumber === linesToSkip && pageStartByte === -1) {
+            pageStartByte = currentByte + i + 1;
+          }
+
+          // check if the end line is reached
+          if (currentLineNumber === linesToSkip + itemsPerPage) {
+            pageEndByte = currentByte + i;
+            break;
+          }
+        }
+      }
+
+      currentByte += bytesRead;
+    }
+
+    // ===== HANDLE EDGE CASES =====
+    // if (linesToSkip === 0) pageStartByte = 0; // First page starts at beginning
+
+    // if (pageEndByte === -1) {
+    //   // Last page - read until end of file
+    //   const stats = fs.statSync(filePath);
+    //   pageEndByte = stats.size;
+    // }
+
+    // if (pageStartByte === -1 || pageStartByte >= pageEndByte) {
+    //   console.log("No Lessons Available");
+    //   fs.closeSync(fd);
+    //   return showmenu();
+    // }
+
+    // ===== READ ONLY THE PAGE DATA =====
+    const pageSize = pageEndByte - pageStartByte;
+    const pageBuffer = Buffer.alloc(pageSize);
+    fs.readSync(fd, pageBuffer, 0, pageSize, pageStartByte);
+    fs.closeSync(fd);
+
+    // ===== DISPLAY PAGE =====
+    const pageContent = pageBuffer.toString("utf8");
+    const lessons = pageContent
+      .trim()
+      .split("\n")
+      .filter((line) => line.trim());
+
+    console.log(`\n--- Page ${page + 1} ---`);
+    lessons.forEach((line, index) => {
+      const lesson = JSON.parse(line);
+      const itemNumber = linesToSkip + index + 1;
+      console.log(
+        `${itemNumber}. [id:${lesson.id}] ${lesson.title} - ${lesson.desc}`,
+      );
+    });
+
+    // ===== SHOW OPTIONS & HANDLE INPUT =====
+    const hasNextPage = currentLineNumber >= linesToSkip + itemsPerPage;
+    const options = [];
+
+    if (hasNextPage) options.push("N = Next");
+    if (page > 0) options.push("P = Prev");
+    if (mode === "edit") options.push("E = Edit");
+    if (mode === "edit") options.push("C = Close");
+    options.push("M = Menu");
+
+    rl.question(`\n[${options.join(" | ")}]: `, (answer) => {
+      const key = answer.toLowerCase();
+
+      if (key === "n" && hasNextPage) {
+        page++;
+        showPage(mode);
+      } else if (key === "p" && page > 0) {
+        page--;
+        showPage(mode);
+      } else if (key === "e" && mode === "edit") {
+        updateList();
+      } else if (key === "c" && mode === "edit") {
+        showmenu();
+      } else if (key === "m") {
+        showmenu();
+      } else {
+        console.log("Invalid Option");
+        showmenu();
+      }
+    });
+  } catch (error) {
+    console.error("Error displaying page:", error);
+    showmenu();
+  }
 }
 
 function viewLesson() {
@@ -241,7 +257,7 @@ function updateList() {
 
     // for each loop displaying lesson
     for (let i = 0; i < lines.length; i++) {
-      const lesson = unpack(JSON.parse(lines[i]));
+      const lesson = JSON.parse(lines[i]);
       if (String(lesson.id) === String(parseInt(id))) {
         found = true;
         lessonIndex = i;
@@ -260,15 +276,7 @@ function updateList() {
     // Ask for new title and description
     rl.question("New Title : ", (newTitle) => {
       rl.question("New Description: ", (newDesc) => {
-        const oldLesson = unpack(JSON.parse(lines[lessonIndex]));
-
-        // bufId.fill(0);
-        // bufTitle.fill(0);
-        // bufDesc.fill(0);
-
-        // bufId.write(oldLesson.id.toString());
-        // bufTitle.write(newTitle || oldLesson.title);
-        // bufDesc.write(newDesc || oldLesson.desc);
+        const oldLesson = JSON.parse(lines[lessonIndex]);
 
         const updatedLesson = {
           id: byteRead(oldLesson.id, COL_ID),
@@ -276,11 +284,59 @@ function updateList() {
           desc: byteRead(newDesc || oldLesson.desc, COL_DESC),
         };
 
-        lines[lessonIndex] = JSON.stringify(pack(updatedLesson));
+        lines[lessonIndex] = JSON.stringify(updatedLesson);
         fs.writeFileSync(filePath, lines.join("\n") + "\n", "utf8");
         console.log("Lesson Updated");
         showmenu();
       });
+    });
+  });
+}
+
+function deleteLesson() {
+  // check if file exists, if not return to menu
+  if (!fs.existsSync(filePath)) {
+    console.log("No Lessons Available");
+    return showmenu();
+  }
+
+  // ask for lesson id to delete
+  rl.question("Enter lesson ID to delete: ", (id) => {
+    const readFileContent = fs.readFileSync(filePath, "utf8");
+    const lines = readFileContent.trim().split("\n");
+    let found = false;
+    let lessonIndex = -1;
+
+    // Find the lesson with matching ID
+    for (let i = 0; i < lines.length; i++) {
+      const lesson = JSON.parse(lines[i]);
+      if (String(lesson.id) === String(parseInt(id))) {
+        found = true;
+        lessonIndex = i;
+        console.log(
+          `\nDeleting: [${lesson.id}] ${lesson.title} - ${lesson.desc}`,
+        );
+        break;
+      }
+    }
+
+    if (!found) {
+      console.log("Lesson not found.");
+      return showmenu();
+    }
+
+    // Ask for confirmation before deleting
+    rl.question("Are you sure? (Y/N): ", (confirm) => {
+      if (confirm.toLowerCase() === "y") {
+        // Remove the lesson from the array
+        lines.splice(lessonIndex, 1);
+        // Write the updated lines back to file
+        fs.writeFileSync(filePath, lines.join("\n") + "\n", "utf8");
+        console.log("Lesson Deleted");
+      } else {
+        console.log("Delete Cancelled");
+      }
+      showmenu();
     });
   });
 }
