@@ -9,6 +9,8 @@ const rl = readline.createInterface({ input, output });
 const IdSize = 10;
 const TitleSize = 50;
 const DescSize = 100;
+const NdJsonSize = 37; // depends ito sa laki ng id, title, at description, dahil ito yung total bytes na kailangan para sa isang record sa file
+const totalFile = IdSize + TitleSize + DescSize + NdJsonSize; // total bytes na kailangan para sa isang record sa file
 
 function insertBuffer(colValue, bufferSized) {
   const buffer = Buffer.alloc(bufferSized);
@@ -71,8 +73,7 @@ function getId(newIds) {
       const position = stats.size - chunkSize; // simula sa posisyon kung saan magsisimula ang pagbasa (sa huling bahagi ng file)
       const idbuf = Buffer.alloc(chunkSize); // buffer para sa pagbasa ng data
 
-
-      //ang ginawa ko dito is neread ko ung last line lang 
+      //ang ginawa ko dito is neread ko ung last line lang
       //kasi yung last line lang yung may pinaka latest id, so babasahin ko lang ung last line para makuha ko yung latest id
 
       fs.read(
@@ -87,22 +88,23 @@ function getId(newIds) {
             return newIds(1);
           }
 
-          fs.close(fileCountChecker, (err) => {});// Isara ang file pagkatapos basahin
+          fs.close(fileCountChecker, (err) => {}); // Isara ang file pagkatapos basahin
+
+          console.log("Bytes read from file:", idbuf); // I-print ang bilang ng bytes na nabasa
 
           const data = idbuf
             .toString()
             .trim()
             .split("\n")
-            .filter((line) => line.trim() !== "");// Tanggalin yung mga empty lines
+            .filter((line) => line.trim() !== ""); // Tanggalin yung mga empty lines
 
           // Kung walang laman ang data, ibig sabihin walang mga data sa file, kaya magsisimula tayo sa ID 1
           if (data.length === 0) {
             return newIds(1);
           }
 
-
           try {
-            const lastLine = data[data.length - 1];// Kunin ang huling line ng data, kaya minus 1 dahil zero-based index
+            const lastLine = data[data.length - 1]; // Kunin ang huling line ng data, kaya minus 1 dahil zero-based index
             const lastRecord = JSON.parse(lastLine);
             const lastId = parseInt(lastRecord.id, 10);
             return newIds(lastId + 1);
@@ -140,7 +142,79 @@ function createLesson() {
   });
 }
 
-function viewLesson() {}
+// nag create ako ng function dito na mag handle ng display 
+function loadAndPaginate(page, displayedLessons) {
+  //notee ko
+  // kung iniisip na maiidisplay kasama null bytes hindi kasi nag trim na tayo sa storing palang
+
+  const pageSize = 10;
+  const skipPage = (page - 1) * pageSize;
+  const viewPosition = skipPage * totalFile;
+  const chunksRecord = pageSize * totalFile * 2; 
+
+
+  fs.open(filePath, "r", (err, fileCountChecker) => {
+    if (err) {
+      return fileCountChecker([]);
+    }
+
+  
+
+    fs.fstat(fileCountChecker, (err, stats) => {
+      if (err || stats.size === 0) {
+        return fileCountChecker([]);
+      }
+
+      const fileBuffer = Buffer.alloc(chunksRecord); // kaya nag allocate sa looob ng fstats para di masayang yung bytes na i-nallocate kasi dito sa loob na vavalidate pa damn
+
+      fs.read(
+        fileCountChecker,
+        fileBuffer,
+        0, //position sa buffer kung saan magsisimula ang pagsulat ng data
+        chunksRecord,
+        viewPosition,//position sa file kung saan magsisimula ang pagbasa
+        (err, bytesRead) => {
+          if (err) {
+            console.error("Error reading file:", err);
+            return fileCountChecker([]);
+          }
+
+          fs.close(fileCountChecker, (err) => {});
+
+          console.log("Bytes read from file:", bytesRead); // I-print ang bilang ng bytes na nabasa
+
+          const data = fileBuffer
+            .toString()
+            .trim()
+            .split("\n")
+            .filter((line) => line.trim() !== ""); // Tanggalin yung mga empty lines'
+
+          const recordSeenCount = 0;
+          const recordList = [];
+
+          for (let line of data) {
+            if (recordSeenCount >= pageSize && recordList.length < pageSize) {
+              try {
+                const record = JSON.parse(line);
+                recordList.push(record);
+              } catch (err) {
+                console.error("Error parsing JSON:", err);
+              }
+            }
+            recordSeenCount++;
+          }
+
+          console.log("Record list:", recordList.length); // I-print ang listahan ng mga record na nakuh
+          displayedLessons(recordList);
+        },
+      );
+    });
+  });
+}
+function viewLesson(page) {
+
+  
+}
 
 function editLesson() {
   console.log("Editing lesson...");
