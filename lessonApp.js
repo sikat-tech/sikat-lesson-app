@@ -16,7 +16,7 @@ function insertBuffer(colValue, bufferSized) {
   const buffer = Buffer.alloc(bufferSized);
   const colValueStr = String(colValue);
   buffer.write(colValueStr, "utf-8");
-  return buffer.subarray(0, colValueStr.length).toString();
+  return buffer.subarray(0, colValueStr.length).toString(); // inalis ko ung subarray
 }
 
 function insertLesson(lesson) {
@@ -142,78 +142,110 @@ function createLesson() {
   });
 }
 
-// nag create ako ng function dito na mag handle ng display 
+// nag create ako ng function dito na mag handle ng display
 function loadAndPaginate(page, displayedLessons) {
   //notee ko
   // kung iniisip na maiidisplay kasama null bytes hindi kasi nag trim na tayo sa storing palang
 
   const pageSize = 10;
   const skipPage = (page - 1) * pageSize;
-  const viewPosition = skipPage * totalFile;
-  const chunksRecord = pageSize * totalFile * 2; 
-
+  const bytesPerRecord = totalFile; // 197
+  // const position = skipPage * bytesPerRecord;
 
   fs.open(filePath, "r", (err, fileCountChecker) => {
     if (err) {
-      return fileCountChecker([]);
+      return displayedLessons([]);
     }
 
-  
+    let filePosition = 0;
+    let allData = "";
+    let newLineCount = 0;
+    let pageRecords = [];
+    
 
-    fs.fstat(fileCountChecker, (err, stats) => {
-      if (err || stats.size === 0) {
-        return fileCountChecker([]);
+    function readChunk() {
+      const buf = Buffer.alloc(512);
+
+      fs.read(fileCountChecker, buf, 0, 512, filePosition, (err, bytesRead) => {
+        if (err || bytesRead === 0) {
+          console.error("Error reading file or end of file reached:", err);
+          fs.close(fileCountChecker, () => {});
+
+          processData(); // I-call ang function na magha-handle ng display ng page records kahit na may error o naabot na ang end of file
+          return; // Exit the function if there's an error or if we've reached the end of the file
+        }
+
+        console.log("Bytes read from file:", bytesRead); // I-print ang bilang ng bytes na nabasa
+        const chunkData = buf.toString("utf-8", 0, bytesRead);
+
+        allData += chunkData;
+        // i add ko yung chunk data sa all data, kasi baka yung isang chunk lang ay hindi sapat para makabuo ng isang buong record, kaya kailangan ko i-accumulate yung data hanggang sa makabuo ako ng isang buong record
+
+        for (let i = 0; i < chunkData.length; i++) {
+          if (chunkData[i] === "\n") {
+            newLineCount++;
+
+            console.log("New line count:", newLineCount); // I-print ang bilang ng mga bagong linya na nabasa
+
+            if (newLineCount >= skipPage + pageSize) {
+              console.log("Page records:", pageRecords); // I-print ang mga records ng page na nabasa
+              fs.close(fileCountChecker, () => {});
+              // Process the page records
+              processData(); // I-call ang function na magha-handle ng display ng page records
+              return; //exit the loop and wait for the next chunk to be read
+            }
+          }
+        }
+
+        filePosition += bytesRead;
+        // position + bytesRead, para mag move yung position sa next chunk
+
+        readChunk(); // I-call ulit ang function para magbasa ng next chunk
+      });
+    }
+
+    function processData() {
+      const lines = allData.split("\n").filter((line) => line.trim() !== ""); // Tanggalin yung mga empty lines
+
+      let recordCount = 0;
+
+      for (let line of lines) {
+        if (recordCount >= skipPage && pageRecords.length < pageSize) {
+          try {
+            const record = JSON.parse(line);
+            pageRecords.push(record);
+          } catch {
+            console.error("Error parsing JSON:", line);
+          }
+        }
+        recordCount++;
       }
 
-      const fileBuffer = Buffer.alloc(chunksRecord); // kaya nag allocate sa looob ng fstats para di masayang yung bytes na i-nallocate kasi dito sa loob na vavalidate pa damn
+      console.log("Final page records:", pageRecords); // I-print ang mga final records ng page na na-process
 
-      fs.read(
-        fileCountChecker,
-        fileBuffer,
-        0, //position sa buffer kung saan magsisimula ang pagsulat ng data
-        chunksRecord,
-        viewPosition,//position sa file kung saan magsisimula ang pagbasa
-        (err, bytesRead) => {
-          if (err) {
-            console.error("Error reading file:", err);
-            return fileCountChecker([]);
-          }
+      displayedLessons(pageRecords);
+    }
 
-          fs.close(fileCountChecker, (err) => {});
-
-          console.log("Bytes read from file:", bytesRead); // I-print ang bilang ng bytes na nabasa
-
-          const data = fileBuffer
-            .toString()
-            .trim()
-            .split("\n")
-            .filter((line) => line.trim() !== ""); // Tanggalin yung mga empty lines'
-
-          const recordSeenCount = 0;
-          const recordList = [];
-
-          for (let line of data) {
-            if (recordSeenCount >= pageSize && recordList.length < pageSize) {
-              try {
-                const record = JSON.parse(line);
-                recordList.push(record);
-              } catch (err) {
-                console.error("Error parsing JSON:", err);
-              }
-            }
-            recordSeenCount++;
-          }
-
-          console.log("Record list:", recordList.length); // I-print ang listahan ng mga record na nakuh
-          displayedLessons(recordList);
-        },
-      );
-    });
+    readChunk(); // Simulan ang pagbasa ng file sa pamamagitan ng pag-call sa readChunk function
   });
 }
-function viewLesson(page) {
 
-  
+function viewLesson(page = 1) {
+  loadAndPaginate(page, (records) => {
+    records.forEach((record, index) => {
+      console.log(
+        `.${index + 1}. ID: ${record.id}, Title: ${record.title}, Description: ${record.description}`,
+      );
+    });
+
+    rl.question("Do you want to view the next page? (Y or N): ", (ans) => {
+      if (ans.toLowerCase() === "y") {
+        viewLesson(page + 1);
+      } else {
+        showMenu();
+      }
+    });
+  });
 }
 
 function editLesson() {

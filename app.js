@@ -132,6 +132,8 @@ function showPage(mode = "view") {
       const bytesRead = fs.readSync(fd, chunk, 0, 50, currentByte);
       if (bytesRead === 0) break; // Reached end of file
 
+
+      // console.log("Bytes read from file:", bytesRead); // I-print ang bilang ng bytes na nabasa
       // Check each byte for newline character
       for (let i = 0; i < bytesRead; i++) {
         if (chunk[i] === 10) {
@@ -155,19 +157,19 @@ function showPage(mode = "view") {
     }
 
     // ===== HANDLE EDGE CASES =====
-    // if (linesToSkip === 0) pageStartByte = 0; // First page starts at beginning
+    if (linesToSkip === 0) pageStartByte = 0; // First page starts at beginning
 
-    // if (pageEndByte === -1) {
-    //   // Last page - read until end of file
-    //   const stats = fs.statSync(filePath);
-    //   pageEndByte = stats.size;
-    // }
+    if (pageEndByte === -1) {
+      // Last page - read until end of file
+      const stats = fs.statSync(filePath);
+      pageEndByte = stats.size;
+    }
 
-    // if (pageStartByte === -1 || pageStartByte >= pageEndByte) {
-    //   console.log("No Lessons Available");
-    //   fs.closeSync(fd);
-    //   return showmenu();
-    // }
+    if (pageStartByte === -1 || pageStartByte >= pageEndByte) {
+      console.log("No Lessons Available");
+      fs.closeSync(fd);
+      return showmenu();
+    }
 
     // ===== READ ONLY THE PAGE DATA =====
     const pageSize = pageEndByte - pageStartByte;
