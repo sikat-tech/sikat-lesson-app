@@ -12,8 +12,13 @@ const DescSize = 100;
 const NdJsonSize = 37; // depends ito sa laki ng id, title, at description, dahil ito yung total bytes na kailangan para sa isang record sa file
 const totalFile = IdSize + TitleSize + DescSize + NdJsonSize; // total bytes na kailangan para sa isang record sa file
 
-function insertBuffer(colValue, bufferSized) {
+function insertBuffer(colValue, bufferSized, type = "string") {
   const buffer = Buffer.alloc(bufferSized);
+  if (type === "number") {
+    buffer.writeUint8(colValue, 0);
+    return buffer
+  };
+
   const colValueStr = String(colValue);
   buffer.write(colValueStr, "utf-8");
   return buffer.toString(); // inalis ko ung subarray
@@ -124,7 +129,7 @@ function createLesson() {
         rl.question("Enter lesson description: ", (description) => {
           getId((newIds) => {
             const lesson = {
-              id: insertBuffer(newIds, IdSize),
+              id: insertBuffer(newIds, IdSize, "number"),
               title: insertBuffer(title, TitleSize),
               description: insertBuffer(description, DescSize),
             };
