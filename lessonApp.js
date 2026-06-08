@@ -249,7 +249,13 @@ function viewLesson(page = 1) {
 }
 
 function editLesson() {
-  console.log("Editing lesson...");
+  
+
+  //display muna lahat ng list without reading entire dataset, same approach sa view 
+  //tapos tatanong kung ano yung id ng lesson na gusto i edit
+  //tapos iread ko lang yung record na yun, para makuha yung title at description
+  // convert json to buffer, tapos iedit ko lang yung title at description sa buffer, tapos iwrite ko ulit sa file gamit ang position ng record na yun, para ma overwrite yung old record, kasi same size lang naman yung new record, kaya pwede ko siya i overwrite without changing the size ng file
+
 }
 
 function deleteLesson() {
