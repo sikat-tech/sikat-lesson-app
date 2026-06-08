@@ -16,7 +16,7 @@ function insertBuffer(colValue, bufferSized) {
   const buffer = Buffer.alloc(bufferSized);
   const colValueStr = String(colValue);
   buffer.write(colValueStr, "utf-8");
-  return buffer.subarray(0, colValueStr.length).toString(); // inalis ko ung subarray
+  return buffer.toString(); // inalis ko ung subarray
 }
 
 function insertLesson(lesson) {
@@ -161,7 +161,6 @@ function loadAndPaginate(page, displayedLessons) {
     let allData = ""; // ito naman storage ng data na nabasa
     let newLineCount = 0; // counter lang to sa newline \n
     let pageRecords = []; //paglalagyan ng record per page
-    
 
     function readChunk() {
       const buf = Buffer.alloc(512); // nag allocate ako ng empty buffer
@@ -180,6 +179,8 @@ function loadAndPaginate(page, displayedLessons) {
 
         allData += chunkData;
         // i add ko yung chunk data sa all data, kasi baka yung isang chunk lang ay hindi sapat para makabuo ng isang buong record, kaya kailangan ko i-accumulate yung data hanggang sa makabuo ako ng isang buong record
+
+        //dito sa for loop, binibilang ko yung mga newline character para malaman ko kung ilang records na ang nabasa ko, kasi yung page size is 10, kaya kapag nakabasa na ako ng 10 newline character, ibig sabihin nakabasa na ako ng 10 records, kaya pwede ko nang i-process yung page records at i-display sa user
 
         for (let i = 0; i < chunkData.length; i++) {
           if (chunkData[i] === "\n") {
@@ -207,7 +208,7 @@ function loadAndPaginate(page, displayedLessons) {
     function processData() {
       const lines = allData.split("\n").filter((line) => line.trim() !== ""); // Tanggalin yung mga empty lines
 
-      let recordCount = 0;// ito yung counter para malaman ko kung ilang records na ang na-process, kasi kailangan ko i-skip yung mga records na hindi kasama sa current page, kaya kailangan ko i-count yung mga records na na-process para malaman ko kung kailan ako magsisimula mag-add ng records sa pageRecords array
+      let recordCount = 0; // ito yung counter para malaman ko kung ilang records na ang na-process, kasi kailangan ko i-skip yung mga records na hindi kasama sa current page, kaya kailangan ko i-count yung mga records na na-process para malaman ko kung kailan ako magsisimula mag-add ng records sa pageRecords array
 
       for (let line of lines) {
         if (recordCount >= skipPage && pageRecords.length < pageSize) {
@@ -249,13 +250,151 @@ function viewLesson(page = 1) {
 }
 
 function editLesson() {
-  
-
-  //display muna lahat ng list without reading entire dataset, same approach sa view 
+  //display muna lahat ng list without reading entire dataset, same approach sa view
   //tapos tatanong kung ano yung id ng lesson na gusto i edit
   //tapos iread ko lang yung record na yun, para makuha yung title at description
-  // convert json to buffer, tapos iedit ko lang yung title at description sa buffer, tapos iwrite ko ulit sa file gamit ang position ng record na yun, para ma overwrite yung old record, kasi same size lang naman yung new record, kaya pwede ko siya i overwrite without changing the size ng file
+  //convert json to buffer, tapos iedit ko lang yung title at description sa buffer, tapos iwrite ko ulit sa file gamit ang position ng record na yun, para ma overwrite yung old record, kasi same size lang naman yung new record, kaya pwede ko siya i overwrite without changing the size ng file
 
+  loadAndPaginate(1, (records) => {
+    console.log("Available lessons:");
+    records.forEach((record, index) => {
+      console.log(
+        `.${index + 1}. ID: ${record.id}, Title: ${record.title}, Description: ${record.description}`,
+      );
+    });
+
+    rl.question("Enter lesson ID to edit: ", (idInput) => {
+      editLessonById(idInput, (success) => {
+        if (success) {
+          console.log("Lesson updated!");
+        } else {
+          console.log("Lesson not found!");
+        }
+        showMenu();
+      });
+    });
+  });
+}
+
+
+function editLessonById(targetId, callback) {
+  fs.open(filePath, "r", (err, fd) => {
+    if (err) return callback(false);
+
+    let filePosition = 0;
+    let allData = "";//storage ng ng data na na read
+    let allRecords = [];//ito yung container ng record
+    let foundRecord = null;//ito yung record na hinahanap ko, kapag nahanap ko na siya, dito ko i store yung data ng record na yun para ma edit ko siya
+    let foundIndex = -1; //ito yung index ng record na yun sa allRecords array
+
+    function readChunk() {
+      const buf = Buffer.alloc(512);
+
+      fs.read(fd, buf, 0, 512, filePosition, (err, bytesRead) => {
+        if (err || bytesRead === 0) {
+          fs.close(fd, () => {});
+
+          // Parse yung remaining data
+          const lines = allData.split("\n").filter((l) => l.trim() !== "");
+
+          for (let line of lines) {
+            try {
+              const record = JSON.parse(line);
+              allRecords.push(record);
+
+              if (record.id === targetId) {
+                foundRecord = record;
+                foundIndex = allRecords.length - 1;
+              }
+            } catch {}
+          }
+
+          // Check if found
+          if (!foundRecord) {
+            return callback(false);
+          }
+
+          // Ask  dito ung ano edit
+          askWhatToEdit(foundRecord, allRecords, foundIndex, callback);
+          return;
+        }
+
+        
+   
+        const chunkData = buf.toString("utf-8", 0, bytesRead);
+        allData += chunkData;
+
+        const lines = allData.split("\n");
+
+        // Keep incomplete line
+        allData = lines[lines.length - 1];
+
+        // Process complete lines
+        for (let i = 0; i < lines.length - 1; i++) {
+          const line = lines[i];
+
+          if (line.trim() !== "") {
+            try {
+              const record = JSON.parse(line);
+              allRecords.push(record);
+
+              // Check if this is target
+              if (record.id === targetId && !foundRecord) {
+                foundRecord = record;
+                foundIndex = allRecords.length - 1;
+              }
+            } catch {}
+          }
+        }
+
+        console.log(`Read ${bytesRead} bytes...`);
+
+        filePosition += bytesRead;
+        readChunk();
+      });
+    }
+
+    readChunk();
+  });
+}
+
+function askWhatToEdit(record, allRecords, foundIndex, callback) {
+  console.log(`\n Found record:`);
+  console.log(`   ID: ${record.id}`);
+  console.log(`   Title: ${record.title}`);
+  console.log(`   Description: ${record.description}`);
+
+  rl.question(
+    "\nWhat to edit? (1=title, 2=description, 0=cancel): ",
+    (choice) => {
+      if (choice === "0") {
+        return callback(false);
+      }
+
+      if (choice === "1") {
+        rl.question("Enter new title: ", (newTitle) => {
+          allRecords[foundIndex].title = newTitle;
+          writeAllRecords(allRecords, callback);
+        });
+      } else if (choice === "2") {
+        rl.question("Enter new description: ", (newDesc) => {
+          allRecords[foundIndex].description = newDesc;
+          writeAllRecords(allRecords, callback);
+        });
+      } else {
+        callback(false);
+      }
+    },
+  );
+}
+
+function writeAllRecords(records, callback) {
+  const lines = records.map((record) => JSON.stringify(record));
+  const fileContent = lines.join("\n") + "\n";
+
+  fs.writeFile(filePath, fileContent, (err) => {
+    callback(!err);
+  });
 }
 
 function deleteLesson() {
