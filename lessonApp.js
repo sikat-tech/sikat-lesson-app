@@ -157,14 +157,14 @@ function loadAndPaginate(page, displayedLessons) {
       return displayedLessons([]);
     }
 
-    let filePosition = 0;
-    let allData = "";
-    let newLineCount = 0;
-    let pageRecords = [];
+    let filePosition = 0; // guys ito ung start pos
+    let allData = ""; // ito naman storage ng data na nabasa
+    let newLineCount = 0; // counter lang to sa newline \n
+    let pageRecords = []; //paglalagyan ng record per page
     
 
     function readChunk() {
-      const buf = Buffer.alloc(512);
+      const buf = Buffer.alloc(512); // nag allocate ako ng empty buffer
 
       fs.read(fileCountChecker, buf, 0, 512, filePosition, (err, bytesRead) => {
         if (err || bytesRead === 0) {
@@ -207,7 +207,7 @@ function loadAndPaginate(page, displayedLessons) {
     function processData() {
       const lines = allData.split("\n").filter((line) => line.trim() !== ""); // Tanggalin yung mga empty lines
 
-      let recordCount = 0;
+      let recordCount = 0;// ito yung counter para malaman ko kung ilang records na ang na-process, kasi kailangan ko i-skip yung mga records na hindi kasama sa current page, kaya kailangan ko i-count yung mga records na na-process para malaman ko kung kailan ako magsisimula mag-add ng records sa pageRecords array
 
       for (let line of lines) {
         if (recordCount >= skipPage && pageRecords.length < pageSize) {
