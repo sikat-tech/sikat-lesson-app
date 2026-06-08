@@ -4,7 +4,8 @@ const filePath = "lessons.ndjson";
 
 const COL_ID = 12;
 const COL_TITLE = 50;
-const COL_DESC = 256;
+const COL_DESC = 223;
+const LINE_RECORD_SIZE = 318;
 
 // Nag declare buffer for global use
 const byteRead = (value, size) => {
@@ -19,11 +20,26 @@ const rl = readline.createInterface({
 });
 
 function appendLesson(lesson) {
-  fs.appendFileSync(
-    filePath,
-    JSON.stringify(lesson) + "\n", //convert lesson object to JSON and append to file.
-    "utf8", // used utf8 kasi mostly english characters
-  );
+  // 1. Create a clean, stripped object
+  const cleanLesson = {
+    id: String(lesson.id).substring(0, COL_ID),
+    title: String(lesson.title).substring(0, COL_TITLE),
+    desc: String(lesson.desc).substring(0, COL_DESC)
+  };
+
+  // 2. Stringify it without the newline ye
+  let jsonStr = JSON.stringify(cleanLesson);
+
+  // 3. Calculate how much padding is needed to force this line to exactly 318 bytes
+  // We subtract 1 to leave room for the '\n' character at the very end
+  const paddingNeeded = LINE_RECORD_SIZE - jsonStr.length - 1;
+
+  if (paddingNeeded > 0) {
+    jsonStr += " ".repeat(paddingNeeded);
+  }
+
+  // 4. Append the finalized 318-byte line
+  fs.appendFileSync(filePath, jsonStr + "\n", "utf8");
 }
 
 function showmenu() {
@@ -63,7 +79,6 @@ function getId() {
 
     const content = fs.readFileSync(filePath, "utf8");
     const lines = content
-      .trim()
       .split("\n")
       .filter((line) => line.trim());
 
@@ -132,8 +147,6 @@ function showPage(mode = "view") {
       const bytesRead = fs.readSync(fd, chunk, 0, 50, currentByte);
       if (bytesRead === 0) break; // Reached end of file
 
-
-      // console.log("Bytes read from file:", bytesRead); // I-print ang bilang ng bytes na nabasa
       // Check each byte for newline character
       for (let i = 0; i < bytesRead; i++) {
         if (chunk[i] === 10) {
@@ -187,9 +200,12 @@ function showPage(mode = "view") {
     console.log(`\n--- Page ${page + 1} ---`);
     lessons.forEach((line, index) => {
       const lesson = JSON.parse(line);
+
+
       const itemNumber = linesToSkip + index + 1;
+
       console.log(
-        `${itemNumber}. [id:${lesson.id}] ${lesson.title} - ${lesson.desc}`,
+        `${itemNumber}. id:${lesson.id} - ${lesson.title} - ${lesson.desc}`,
       );
     });
 
@@ -245,50 +261,92 @@ function editLesson() {
   showPage("edit");
 }
 
+ function findLessonIndex(id) {
+  if (!fs.existsSync(filePath)) return { found: false };
+
+  // Convert input to a clean integer
+  const idNum = parseInt(id, 10);
+  if (isNaN(idNum) || idNum < 1) return { found: false };
+
+  const fd = fs.openSync(filePath, "r");
+  const stats = fs.statSync(filePath);
+
+  // Math-calculate exactly where this ID's block lives
+  const targetIndex = idNum - 1; 
+  const byteOffset = targetIndex * LINE_RECORD_SIZE; 
+
+  // Guard: Check if the calculated offset is beyond the actual file size
+  if (byteOffset >= stats.size) {
+    fs.closeSync(fd);
+    return { found: false };
+  }
+
+  try {
+    const recordBuffer = Buffer.alloc(LINE_RECORD_SIZE);
+    fs.readSync(fd, recordBuffer, 0, LINE_RECORD_SIZE, byteOffset);
+
+    const lineStr = recordBuffer.toString("utf8").trim();
+    if (!lineStr) return { found: false };
+
+    const lesson = JSON.parse(lineStr);
+
+    // Verify it's actually the correct ID and not a recycled/tombstoned row
+    if (String(lesson.id) === String(id)) {
+      console.log(`Directly jumped to record at byte offset ${byteOffset}!`);
+      return {
+        found: true,
+        index: targetIndex,
+        byteOffset: byteOffset,
+        recordSize: LINE_RECORD_SIZE,
+        lesson
+      };
+    }
+  } catch (err) {
+    console.error("Error doing random-access read:", err);
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  return { found: false };
+}
+
 function updateList() {
   rl.question("Enter lesson ID to edit: ", (id) => {
-    if (!fs.existsSync(filePath)) {
-      console.log("No Lessons Available");
-      return showmenu();
-    }
+    const result = findLessonIndex(id);
 
-    const readFileContent = fs.readFileSync(filePath, "utf8");
-    const lines = readFileContent.trim().split("\n");
-    let found = false;
-    let lessonIndex = -1;
-
-    // for each loop displaying lesson
-    for (let i = 0; i < lines.length; i++) {
-      const lesson = JSON.parse(lines[i]);
-      if (String(lesson.id) === String(parseInt(id))) {
-        found = true;
-        lessonIndex = i;
-        console.log(
-          `\nCurrent: [${lesson.id}] ${lesson.title} - ${lesson.desc}`,
-        );
-        break;
-      }
-    }
-
-    if (!found) {
+    if (!result.found) {
       console.log("Lesson not found.");
       return showmenu();
     }
 
-    // Ask for new title and description
+    console.log(`\nCurrent: [${result.lesson.id}] ${result.lesson.title} - ${result.lesson.desc}`);
+
     rl.question("New Title : ", (newTitle) => {
       rl.question("New Description: ", (newDesc) => {
-        const oldLesson = JSON.parse(lines[lessonIndex]);
-
+        
         const updatedLesson = {
-          id: byteRead(oldLesson.id, COL_ID),
-          title: byteRead(newTitle || oldLesson.title, COL_TITLE),
-          desc: byteRead(newDesc || oldLesson.desc, COL_DESC),
+          id: result.lesson.id,
+          title: (newTitle || result.lesson.title).substring(0, COL_TITLE),
+          desc: (newDesc || result.lesson.desc).substring(0, COL_DESC),
         };
 
-        lines[lessonIndex] = JSON.stringify(updatedLesson);
-        fs.writeFileSync(filePath, lines.join("\n") + "\n", "utf8");
-        console.log("Lesson Updated");
+        let jsonStr = JSON.stringify(updatedLesson);
+        const paddingNeeded = LINE_RECORD_SIZE - jsonStr.length - 1;
+
+        if (paddingNeeded > 0) {
+          jsonStr += " ".repeat(paddingNeeded);
+        }
+        
+        const updatedLine = jsonStr + "\n";
+
+        // Open file and write directly to the target block location
+        const fd = fs.openSync(filePath, "r+");
+        const writeBuffer = Buffer.from(updatedLine, "utf8");
+        
+        fs.writeSync(fd, writeBuffer, 0, LINE_RECORD_SIZE, result.byteOffset);
+        fs.closeSync(fd);
+
+        console.log("Lesson Updated!");
         showmenu();
       });
     });
@@ -296,45 +354,42 @@ function updateList() {
 }
 
 function deleteLesson() {
-  // check if file exists, if not return to menu
   if (!fs.existsSync(filePath)) {
     console.log("No Lessons Available");
     return showmenu();
   }
 
-  // ask for lesson id to delete
   rl.question("Enter lesson ID to delete: ", (id) => {
-    const readFileContent = fs.readFileSync(filePath, "utf8");
-    const lines = readFileContent.trim().split("\n");
-    let found = false;
-    let lessonIndex = -1;
+    const result = findLessonIndex(id);
 
-    // Find the lesson with matching ID
-    for (let i = 0; i < lines.length; i++) {
-      const lesson = JSON.parse(lines[i]);
-      if (String(lesson.id) === String(parseInt(id))) {
-        found = true;
-        lessonIndex = i;
-        console.log(
-          `\nDeleting: [${lesson.id}] ${lesson.title} - ${lesson.desc}`,
-        );
-        break;
-      }
-    }
-
-    if (!found) {
-      console.log("Lesson not found.");
+    if (!result.found) {
+      console.log("Data already deleted or not found.");
       return showmenu();
     }
 
-    // Ask for confirmation before deleting
+    console.log(`\nDeleting: [${result.lesson.id}] ${result.lesson.title} - ${result.lesson.desc}`);
+
     rl.question("Are you sure? (Y/N): ", (confirm) => {
       if (confirm.toLowerCase() === "y") {
-        // Remove the lesson from the array
-        lines.splice(lessonIndex, 1);
-        // Write the updated lines back to file
-        fs.writeFileSync(filePath, lines.join("\n") + "\n", "utf8");
-        console.log("Lesson Deleted");
+        
+        // 1. Create a standardized "Deleted/Tombstone" row that matches exactly 318 bytes
+        const deletedObject = { id: "DELETED", title: "", desc: "" };
+        let jsonStr = JSON.stringify(deletedObject);
+        const paddingNeeded = LINE_RECORD_SIZE - jsonStr.length - 1;
+        
+        if (paddingNeeded > 0) {
+          jsonStr += " ".repeat(paddingNeeded);
+        }
+        const deletedLine = jsonStr + "\n";
+
+        // 2. Overwrite ONLY that specific position in the file instantly
+        const fd = fs.openSync(filePath, "r+");
+        const writeBuffer = Buffer.from(deletedLine, "utf8");
+        
+        fs.writeSync(fd, writeBuffer, 0, LINE_RECORD_SIZE, result.byteOffset);
+        fs.closeSync(fd);
+
+        console.log("Lesson Deleted (Marked as inactive)");
       } else {
         console.log("Delete Cancelled");
       }
