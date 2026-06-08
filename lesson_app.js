@@ -5,7 +5,7 @@ const filePath = "lessons.ndjson";
 const COL_ID = 12;
 const COL_TITLE = 50;
 const COL_DESC = 256;
-const MAX_LENGTH = COL_ID + COL_TITLE + COL_DESC + 50; // ~368 bytes (includes JSON overhead and newline)
+const MAX_LENGTH = COL_ID + COL_TITLE + COL_DESC; // 318 bytes
 
 const rl = readline.createInterface({
   input: process.stdin,
