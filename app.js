@@ -124,9 +124,11 @@ function createLesson() {
 let page = 0;
 
 function showPage(mode = "view") {
-  // ===== SETUP =====
   const itemsPerPage = 10;
-  const linesToSkip = page * itemsPerPage; // How many lines to skip
+  
+  // Math calculation: Page 0 starts at 0, Page 1 starts at 3180, etc.
+  const pageStartByte = page * itemsPerPage * LINE_RECORD_SIZE; 
+  const pageSize = itemsPerPage * LINE_RECORD_SIZE;
 
   try {
     if (!fs.existsSync(filePath)) {
@@ -134,83 +136,54 @@ function showPage(mode = "view") {
       return showmenu();
     }
 
-    // ===== FIND WHERE PAGE DATA STARTS & ENDS =====
-    const fd = fs.openSync(filePath, "r");
-    let currentByte = 0; //store byte for pagestartbyte and pageendbyte
-    let currentLineNumber = 0; //used for reference to get the line
-    let pageStartByte = -1; //start to 1 kasi wala naman byte na = 1
-    let pageEndByte = -1; //start to 1 kasi wala naman byte na = 1
-
-    // Scan file in 50-byte chunks, looking for newlines
-    while (true) {
-      const chunk = Buffer.alloc(50);
-      const bytesRead = fs.readSync(fd, chunk, 0, 50, currentByte);
-      if (bytesRead === 0) break; // Reached end of file
-
-      // Check each byte for newline character
-      for (let i = 0; i < bytesRead; i++) {
-        if (chunk[i] === 10) {
-          // 10 is newline character in ASCII
-          currentLineNumber++;
-
-          // check what line is being counted
-          if (currentLineNumber === linesToSkip && pageStartByte === -1) {
-            pageStartByte = currentByte + i + 1;
-          }
-
-          // check if the end line is reached
-          if (currentLineNumber === linesToSkip + itemsPerPage) {
-            pageEndByte = currentByte + i;
-            break;
-          }
-        }
-      }
-
-      currentByte += bytesRead;
-    }
-
-    // ===== HANDLE EDGE CASES =====
-    if (linesToSkip === 0) pageStartByte = 0; // First page starts at beginning
-
-    if (pageEndByte === -1) {
-      // Last page - read until end of file
-      const stats = fs.statSync(filePath);
-      pageEndByte = stats.size;
-    }
-
-    if (pageStartByte === -1 || pageStartByte >= pageEndByte) {
-      console.log("No Lessons Available");
-      fs.closeSync(fd);
+    const stats = fs.statSync(filePath);
+    
+    // Guard: If the user navigates past the end of the file, stop them
+    if (pageStartByte >= stats.size) {
+      console.log("\n--- No More Lessons Available ---");
+      if (page > 0) page--; // Fallback to previous valid page
       return showmenu();
     }
 
-    // ===== READ ONLY THE PAGE DATA =====
-    const pageSize = pageEndByte - pageStartByte;
-    const pageBuffer = Buffer.alloc(pageSize);
-    fs.readSync(fd, pageBuffer, 0, pageSize, pageStartByte);
+    // Adjust pageSize if the last page has fewer than 10 items remaining
+    const bytesToRead = Math.min(pageSize, stats.size - pageStartByte);
+
+    console.log(bytesToRead);
+
+    // ===== READ ONLY THE TARGET PAGE WINDOW =====
+    const fd = fs.openSync(filePath, "r");
+    const pageBuffer = Buffer.alloc(bytesToRead);
+
+    console.log(pageBuffer);
+    fs.readSync(fd, pageBuffer, 0, bytesToRead, pageStartByte);
+
+    console.log(bytesToRead);
     fs.closeSync(fd);
 
-    // ===== DISPLAY PAGE =====
+    // console.log(`Read ${bytesToRead}`);
+
+    // ===== DISPLAY PAGE CONTENT =====
     const pageContent = pageBuffer.toString("utf8");
-    const lessons = pageContent
-      .trim()
-      .split("\n")
-      .filter((line) => line.trim());
+    const lines = pageContent.split("\n");
+    const lessons = lines.filter((line) => line.trim());
+
+    // console.log(pageContent);
 
     console.log(`\n--- Page ${page + 1} ---`);
     lessons.forEach((line, index) => {
-      const lesson = JSON.parse(line);
-
-
-      const itemNumber = linesToSkip + index + 1;
-
-      console.log(
-        `${itemNumber}. id:${lesson.id} - ${lesson.title} - ${lesson.desc}`,
-      );
+      // skip any deleted "tombstone" records if they exist
+      if (line.includes('"id":"DELETED"')) {
+        return; 
+      }
+      
+      const lesson = JSON.parse(line.trim());
+      const itemNumber = (page * itemsPerPage) + index + 1;
+      console.log(`${itemNumber}. id:${lesson.id} - ${lesson.title} - ${lesson.desc}`);
     });
 
-    // ===== SHOW OPTIONS & HANDLE INPUT =====
-    const hasNextPage = currentLineNumber >= linesToSkip + itemsPerPage;
+    // ===== DETERMINE NEXT PAGE AVAILABILITY =====
+    // If there are more bytes left in the file after this window, a next page exists
+    const hasNextPage = (pageStartByte + bytesToRead) < stats.size;
     const options = [];
 
     if (hasNextPage) options.push("N = Next");
@@ -261,7 +234,7 @@ function editLesson() {
   showPage("edit");
 }
 
- function findLessonIndex(id) {
+function findLessonIndex(id) {
   if (!fs.existsSync(filePath)) return { found: false };
 
   // Convert input to a clean integer
