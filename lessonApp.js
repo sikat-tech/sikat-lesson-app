@@ -12,16 +12,11 @@ const DescSize = 100;
 const NdJsonSize = 37; // depends ito sa laki ng id, title, at description, dahil ito yung total bytes na kailangan para sa isang record sa file
 const totalFile = IdSize + TitleSize + DescSize + NdJsonSize; // total bytes na kailangan para sa isang record sa file
 
-function insertBuffer(colValue, bufferSized, type = "string") {
+function insertBuffer(colValue, bufferSized) {
   const buffer = Buffer.alloc(bufferSized);
-  if (type === "number") {
-    buffer.writeUint8(colValue, 0);
-    return buffer
-  };
-
   const colValueStr = String(colValue);
   buffer.write(colValueStr, "utf-8");
-  return buffer.toString(); // inalis ko ung subarray
+  return buffer.subarray(0, colValueStr.length).toString(); // inalis ko ung subarray
 }
 
 function insertLesson(lesson) {
@@ -112,6 +107,8 @@ function getId(newIds) {
             const lastLine = data[data.length - 1]; // Kunin ang huling line ng data, kaya minus 1 dahil zero-based index
             const lastRecord = JSON.parse(lastLine);
             const lastId = parseInt(lastRecord.id, 10);
+
+            
             return newIds(lastId + 1);
           } catch (err) {
             return newIds(1);
@@ -129,7 +126,7 @@ function createLesson() {
         rl.question("Enter lesson description: ", (description) => {
           getId((newIds) => {
             const lesson = {
-              id: insertBuffer(newIds, IdSize, "number"),
+              id: insertBuffer(newIds, IdSize),
               title: insertBuffer(title, TitleSize),
               description: insertBuffer(description, DescSize),
             };
