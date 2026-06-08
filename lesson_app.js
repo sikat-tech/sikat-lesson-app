@@ -5,7 +5,7 @@ const filePath = "lessons.ndjson";
 const COL_ID = 12;
 const COL_TITLE = 50;
 const COL_DESC = 256;
-const CHUNK_SIZE = 4096; // Read file in small 4KB increments
+const MAX_LENGTH = COL_ID + COL_TITLE + COL_DESC + 50; // ~368 bytes (includes JSON overhead and newline)
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -22,11 +22,41 @@ function processString(value, maxSize) {
   return buf.toString("utf8").replace(/\0/g, "").trim();
 }
 
+// Calculate byte offset for a given row index
+function getOffsetForIndex(index) {
+  return index * MAX_LENGTH;
+}
+
+// Read a single record at a specific byte offset
+function readRecordAtOffset(offset) {
+  if (!fs.existsSync(filePath)) return null;
+
+  try {
+    const fd = fs.openSync(filePath, "r");
+    const buffer = Buffer.alloc(MAX_LENGTH);
+    const bytesRead = fs.readSync(fd, buffer, 0, MAX_LENGTH, offset);
+    fs.closeSync(fd);
+
+    if (bytesRead === 0) return null; // Beyond end of file
+
+    const line = buffer.toString("utf8", 0, bytesRead).split("\n")[0];
+    if (!line.trim()) return null;
+
+    try {
+      return JSON.parse(line);
+    } catch (e) {
+      return null;
+    }
+  } catch (err) {
+    return null;
+  }
+}
+
 function readLinesChunked(callback) {
   if (!fs.existsSync(filePath)) return;
 
   const fd = fs.openSync(filePath, "r");
-  const buffer = Buffer.alloc(CHUNK_SIZE);
+  const buffer = Buffer.alloc(MAX_LENGTH);
   let bytesRead = 0;
   let position = 0;
   let leftover = "";
@@ -56,34 +86,26 @@ function readLinesChunked(callback) {
   fs.closeSync(fd);
 }
 
-// Fetch only the records required for the current page
+// Fetch only the records required for the current page using offset calculation
 function getPageRecords(page, itemsPerPage) {
   const startIndex = page * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
   const pageItems = [];
-  let currentIndex = 0;
-  let hasNextPage = false;
 
-  readLinesChunked((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return false;
-
-    if (currentIndex >= startIndex && currentIndex < endIndex) {
-      try {
-        pageItems.push(JSON.parse(trimmed));
-      } catch (e) { /* skip corrupt lines */ }
-    } else if (currentIndex === endIndex) {
-      hasNextPage = true;
-      return true; // Stop execution immediately; we found what we needed
+  // Try to read itemsPerPage + 1 records to detect if there's a next page
+  for (let i = 0; i < itemsPerPage + 1; i++) {
+    const record = readRecordAtOffset(getOffsetForIndex(startIndex + i));
+    if (!record) break; // No more records
+    if (i < itemsPerPage) {
+      pageItems.push(record);
     }
-    currentIndex++;
-    return false;
-  });
+  }
+
+  const hasNextPage = pageItems.length === itemsPerPage && readRecordAtOffset(getOffsetForIndex(startIndex + itemsPerPage)) !== null;
 
   return { pageItems, hasNextPage };
 }
 
-// Locate a single record by ID without loading any other row into memory
+// Locate a single record by ID (requires sequential scan since ID lookup needs index)
 function findRecordById(id) {
   let foundRecord = null;
 
@@ -101,6 +123,11 @@ function findRecordById(id) {
   });
 
   return foundRecord;
+}
+
+// Locate record by row index (efficient offset-based lookup)
+function findRecordByIndex(index) {
+  return readRecordAtOffset(getOffsetForIndex(index));
 }
 
 // Modifies or drops rows by writing sequentially to a temp file in chunks
