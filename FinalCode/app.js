@@ -6,7 +6,7 @@ const COL_ID = 12;
 const COL_TITLE = 50;
 const COL_DESC = 223;
 const LINE_RECORD_SIZE = 318;
-
+ 
 // Nag declare buffer for global use
 const byteRead = (value, size) => {
   const buf = Buffer.alloc(size);
@@ -122,13 +122,10 @@ function createLesson() {
 }
 
 let page = 0;
+let currentSortMode = "id";
 
 function showPage(mode = "view") {
   const itemsPerPage = 10;
-  
-  // Math calculation: Page 0 starts at 0, Page 1 starts at 3180, etc.
-  const pageStartByte = page * itemsPerPage * LINE_RECORD_SIZE; 
-  const pageSize = itemsPerPage * LINE_RECORD_SIZE;
 
   try {
     if (!fs.existsSync(filePath)) {
@@ -137,57 +134,72 @@ function showPage(mode = "view") {
     }
 
     const stats = fs.statSync(filePath);
-    
-    // Guard: If the user navigates past the end of the file, stop them
-    if (pageStartByte >= stats.size) {
-      console.log("\n--- No More Lessons Available ---");
-      if (page > 0) page--; // Fallback to previous valid page
+    const totalRecords = Math.floor(stats.size / LINE_RECORD_SIZE);
+
+    if (totalRecords === 0) {
+      console.log("No Lessons Available");
       return showmenu();
     }
 
-    // Adjust pageSize if the last page has fewer than 10 items remaining
-    const bytesToRead = Math.min(pageSize, stats.size - pageStartByte);
-
-    console.log(bytesToRead);
-
-    // ===== READ ONLY THE TARGET PAGE WINDOW =====
     const fd = fs.openSync(filePath, "r");
-    const pageBuffer = Buffer.alloc(bytesToRead);
+    let allValidLessons = [];
 
-    console.log(pageBuffer);
-    fs.readSync(fd, pageBuffer, 0, bytesToRead, pageStartByte);
+    // Gather keys for index layout mapping
+    for (let i = 0; i < totalRecords; i++) {
+      const byteOffset = i * LINE_RECORD_SIZE;
+      const recordBuffer = Buffer.alloc(LINE_RECORD_SIZE);
+      fs.readSync(fd, recordBuffer, 0, LINE_RECORD_SIZE, byteOffset);
 
-    console.log(bytesToRead);
+      const rawStr = recordBuffer.toString("utf8");
+      const firstBrace = rawStr.indexOf("{");
+      const lastBrace = rawStr.lastIndexOf("}");
+
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {  //{fdft}
+        const cleanJsonStr = rawStr.substring(firstBrace, lastBrace + 1);
+        const lesson = JSON.parse(cleanJsonStr);
+
+        if (lesson.id !== "DELETED") {
+          allValidLessons.push({
+            id: Number(lesson.id),
+            title: lesson.title,
+            desc: lesson.desc,
+            offset: byteOffset
+          });
+        }
+      }
+    }
     fs.closeSync(fd);
 
-    // console.log(`Read ${bytesToRead}`);
+    // Apply Sort conditional rules on our layout array before pagination slices it
+    if (currentSortMode === "title") {
+      allValidLessons.sort((a, b) => a.title.localeCompare(b.title));
+    } else {
+      allValidLessons.sort((a, b) => a.id - b.id); // Sort by numerical ID
+    }
 
-    // ===== DISPLAY PAGE CONTENT =====
-    const pageContent = pageBuffer.toString("utf8");
-    const lines = pageContent.split("\n");
-    const lessons = lines.filter((line) => line.trim());
+    // Slice out our targeted pagination page array window
+    const startIndex = page * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, allValidLessons.length);
+    const pageLessons = allValidLessons.slice(startIndex, endIndex);
 
-    // console.log(pageContent);
+    if (pageLessons.length === 0 && page > 0) {
+      page--;  
+      return showPage(mode);
+    }
 
-    console.log(`\n--- Page ${page + 1} ---`);
-    lessons.forEach((line, index) => {
-      // skip any deleted "tombstone" records if they exist
-      if (line.includes('"id":"DELETED"')) {
-        return; 
-      }
-      
-      const lesson = JSON.parse(line.trim());
-      const itemNumber = (page * itemsPerPage) + index + 1;
+    console.log(`\n--- Page ${page + 1} (Sorted by: ${currentSortMode.toUpperCase()}) ---`);
+    pageLessons.forEach((lesson, index) => {
+      const itemNumber = startIndex + index + 1;
       console.log(`${itemNumber}. id:${lesson.id} - ${lesson.title} - ${lesson.desc}`);
     });
 
-    // ===== DETERMINE NEXT PAGE AVAILABILITY =====
-    // If there are more bytes left in the file after this window, a next page exists
-    const hasNextPage = (pageStartByte + bytesToRead) < stats.size;
+    // Option controls
+    const hasNextPage = endIndex < allValidLessons.length;
     const options = [];
 
     if (hasNextPage) options.push("N = Next");
     if (page > 0) options.push("P = Prev");
+    options.push("S = Sort"); // Lets user switch sort modes on the fly
     if (mode === "edit") options.push("E = Edit");
     if (mode === "edit") options.push("C = Close");
     options.push("M = Menu");
@@ -201,6 +213,10 @@ function showPage(mode = "view") {
       } else if (key === "p" && page > 0) {
         page--;
         showPage(mode);
+      } else if (key === "s") {
+        // Toggle sort type criteria and refresh page display
+        currentSortMode = currentSortMode === "id" ? "title" : "id";
+        showPage(mode);
       } else if (key === "e" && mode === "edit") {
         updateList();
       } else if (key === "c" && mode === "edit") {
@@ -213,7 +229,7 @@ function showPage(mode = "view") {
       }
     });
   } catch (error) {
-    console.error("Error displaying page:", error);
+    console.error("Error displaying sorted page view window:", error);
     showmenu();
   }
 }
@@ -248,7 +264,6 @@ function findLessonIndex(id) {
   const targetIndex = idNum - 1; 
   const byteOffset = targetIndex * LINE_RECORD_SIZE; 
 
-  // Guard: Check if the calculated offset is beyond the actual file size
   if (byteOffset >= stats.size) {
     fs.closeSync(fd);
     return { found: false };
@@ -263,7 +278,7 @@ function findLessonIndex(id) {
 
     const lesson = JSON.parse(lineStr);
 
-    // Verify it's actually the correct ID and not a recycled/tombstoned row
+    // Verify it's actually the correct ID and not a tombstoned row
     if (String(lesson.id) === String(id)) {
       console.log(`Directly jumped to record at byte offset ${byteOffset}!`);
       return {
