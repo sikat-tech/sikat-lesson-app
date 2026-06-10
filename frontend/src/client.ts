@@ -1,65 +1,133 @@
 import net from "node:net";
 import readline from "node:readline";
-import promises from "node:fs/promises";
 
-
-// Create a readline interface for reading user input from the terminal
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-// Connect to the server
-const client = net.createConnection({ port: 3000, host: "localhost" }, () => {
-  console.log("Connected to server!");
-  console.log("Type a message and press Enter to send. Type 'exit' to quit.\n");
-  promptUser();
+function ask(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    rl.question(question, resolve);
+  });
+}
+const client = net.createConnection({ port: 3000, host: "127.0.0.1" }, () => {
+  console.log("Connected to Lesson Server!");
+  showMenu();
 });
 
-// Listen for messages from the server (from other clients)
+let dataBuffer = "";
+
 client.on("data", (data) => {
-  const message = data.toString().trim();
-  console.log(`\n[Other Client]: ${message}`);
-  promptUser(); // Show the prompt again
+  dataBuffer += data.toString();
+
+  let newlineIndex: number;
+  while ((newlineIndex = dataBuffer.indexOf("\n")) !== -1) {
+    const rawMessage = dataBuffer.substring(0, newlineIndex).trim();
+    dataBuffer = dataBuffer.substring(newlineIndex + 1);
+
+    if (!rawMessage) continue;
+
+    try {
+      const response = JSON.parse(rawMessage);
+      handleServerResponse(response);
+    } catch {
+      console.log(`[Server]: ${rawMessage}`);
+    }
+  }
 });
 
-// Handle when the connection closes
+function handleServerResponse(response: { action: string; lessons?: Array<{ id: string; title: string; desc: string }>; message?: string; lesson?: { id: string; title: string; desc: string } }) {
+  if (response.action === "lesson_created") {
+    console.log(`\nLesson created successfully!`);
+    if (response.lesson) {
+      console.log(`   ID: ${response.lesson.id}`);
+      console.log(`   Title: ${response.lesson.title}`);
+      console.log(`   Description: ${response.lesson.desc}`);
+    }
+    showMenu();
+  } else if (response.action === "lessons_list") {
+    const lessons = response.lessons ?? [];
+    if (lessons.length === 0) {
+      console.log("\nNo lessons available.");
+    } else {
+      console.log(`\n ─── All Lessons (${lessons.length}) ───`);
+      lessons.forEach((lesson, index) => {
+        console.log(`  ${index + 1}. [ID: ${lesson.id}] ${lesson.title}`);
+        console.log(`     ${lesson.desc}`);
+      });
+    }
+    showMenu();
+  } else if (response.action === "error") {
+    console.log(`\nError: ${response.message}`);
+    showMenu();
+  } else if (response.action === "new_lesson_broadcast") {
+    if (response.lesson) {
+      console.log(`\nNew lesson added by another client: "${response.lesson.title}"`);
+    }
+  }
+}
+
 client.on("end", () => {
   console.log("\nDisconnected from server");
   process.exit(0);
 });
 
-// Handle connection errors
 client.on("error", (err) => {
   console.error("Connection error:", err.message);
   process.exit(1);
 });
 
-// Function to prompt the user for input
-async function promptUser() {
-  const input = await new Promise<string>((resolve) => {
-    rl.question("You: ", resolve);
-  });
-  const message = input.trim();
 
-  // Allow user to exit
-  if (message.toLowerCase() === "exit") {
+async function showMenu() {
+  console.log("\n─── Lesson Menu ───");
+  console.log("1. Create Lesson");
+  console.log("2. View Lessons");
+  console.log("3. Exit");
+
+  const choice = await ask("Choose an option: ");
+
+  if (choice === "1") {
+    await createLesson();
+  } else if (choice === "2") {
+    viewLessons();
+  } else if (choice === "3") {
     console.log("Goodbye!");
     client.end();
     rl.close();
-    return;
+  } else {
+    console.log("Invalid option.");
+    showMenu();
   }
-
-  // Send the message to the server
-  if (message) {
-    client.write(message + "\n");
-  }
-
-  // Ask for the next message
-  await promptUser();
 }
 
-// Handle when user exits the program (Ctrl+C)
+async function createLesson() {
+  const title = await ask("Lesson Title: ");
+  if (!title.trim()) {
+    console.log("Title cannot be empty.");
+    return showMenu();
+  }
+
+  const desc = await ask("Description: ");
+  if (!desc.trim()) {
+    console.log("Description cannot be empty.");
+    return showMenu();
+  }
+
+  const request = {
+    action: "create",
+    title: title.trim(),
+    desc: desc.trim(),
+  };
+
+  client.write(JSON.stringify(request) + "\n");
+}
+
+function viewLessons() {
+  const request = { action: "view" };
+  client.write(JSON.stringify(request) + "\n");
+}
+
 process.on("SIGINT", () => {
   console.log("\nExiting...");
   client.end();
