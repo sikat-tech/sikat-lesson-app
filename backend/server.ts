@@ -1,28 +1,23 @@
 import net from "node:net";
 import fs from "node:fs";
-
 const LESSONS_FILE = "frontend/lessons.ndjson";
-
 interface Lesson {
   id: string;
   title: string;
   desc: string;
 }
-
 interface ServerResponse {
   action: string;
   lessons?: Lesson[];
   message?: string;
   lesson?: Lesson;
 }
-
 interface Request {
   action: "create" | "view";
   title?: string;
   desc?: string;
 }
 
- 
 
 const PORT = 3000;
 const COL_ID = 12;
@@ -100,7 +95,7 @@ function handleRequest(socket: net.Socket, raw: string): void {
   try {
     request = JSON.parse(raw) as Request;
   } catch {
-    socket.write(JSON.stringify({ action: "error", message: "Invalid JSON" } satisfies ServerResponse) + "\n");
+    socket.write(JSON.stringify({ action: "error", message: "Invalid request format." } satisfies ServerResponse) + "\n");
     return;
   }
 
@@ -109,7 +104,7 @@ function handleRequest(socket: net.Socket, raw: string): void {
     const desc = request.desc ?? "";
 
     if (!title.trim() || !desc.trim()) {
-      socket.write(JSON.stringify({ action: "error", message: "Title and description are required" } satisfies ServerResponse) + "\n");
+      socket.write(JSON.stringify({ action: "error", message: "Title and description cannot be empty." } satisfies ServerResponse) + "\n");
       return;
     }
 
@@ -177,7 +172,5 @@ const server = net.createServer((socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Lesson Server listening on port ${PORT}`);
-  console.log(`Storing lessons in: ${LESSONS_FILE}`);
-  console.log("Ready for clients...\n");
+  console.log(` Server listening on port ${PORT}`);
 });
