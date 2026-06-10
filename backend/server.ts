@@ -1,7 +1,28 @@
 import net from "node:net";
 import fs from "node:fs";
-const LESSONS_FILE = ("frontend/lessons.ndjson");
 
+const LESSONS_FILE = "frontend/lessons.ndjson";
+
+interface Lesson {
+  id: string;
+  title: string;
+  desc: string;
+}
+
+interface ServerResponse {
+  action: string;
+  lessons?: Lesson[];
+  message?: string;
+  lesson?: Lesson;
+}
+
+interface Request {
+  action: "create" | "view";
+  title?: string;
+  desc?: string;
+}
+
+ 
 
 const PORT = 3000;
 const COL_ID = 12;
@@ -32,8 +53,8 @@ function getNextId(): number {
   }
 }
 
-function appendLesson(lesson: { id: string; title: string; desc: string }): void {
-  const cleanLesson = {
+function appendLesson(lesson: Lesson): void {
+  const cleanLesson: Lesson = {
     id: String(lesson.id).substring(0, COL_ID),
     title: String(lesson.title).substring(0, COL_TITLE),
     desc: String(lesson.desc).substring(0, COL_DESC),
@@ -49,22 +70,22 @@ function appendLesson(lesson: { id: string; title: string; desc: string }): void
   fs.appendFileSync(LESSONS_FILE, jsonStr + "\n", "utf8");
 }
 
-function getAllLessons(): Array<{ id: string; title: string; desc: string }> {
+function getAllLessons(): Lesson[] {
   try {
     if (!fs.existsSync(LESSONS_FILE)) return [];
 
     const content = fs.readFileSync(LESSONS_FILE, "utf8");
     const lines = content.split("\n").filter((line) => line.trim());
 
-    const lessons: Array<{ id: string; title: string; desc: string }> = [];
+    const lessons: Lesson[] = [];
     for (const line of lines) {
       try {
-        const parsed = JSON.parse(line.trim()) as { id: string; title: string; desc: string };
+        const parsed = JSON.parse(line.trim()) as Lesson;
         if (parsed.id !== "DELETED") {
           lessons.push(parsed);
         }
       } catch {
-        
+        console.error("Failed to parse line:", line);
       }
     }
 
@@ -75,11 +96,11 @@ function getAllLessons(): Array<{ id: string; title: string; desc: string }> {
 }
 
 function handleRequest(socket: net.Socket, raw: string): void {
-  let request: { action?: string; title?: string; desc?: string };
+  let request: Request;
   try {
-    request = JSON.parse(raw) as { action?: string; title?: string; desc?: string };
+    request = JSON.parse(raw) as Request;
   } catch {
-    socket.write(JSON.stringify({ action: "error", message: "Invalid JSON" }) + "\n");
+    socket.write(JSON.stringify({ action: "error", message: "Invalid JSON" } satisfies ServerResponse) + "\n");
     return;
   }
 
@@ -88,12 +109,12 @@ function handleRequest(socket: net.Socket, raw: string): void {
     const desc = request.desc ?? "";
 
     if (!title.trim() || !desc.trim()) {
-      socket.write(JSON.stringify({ action: "error", message: "Title and description are required" }) + "\n");
+      socket.write(JSON.stringify({ action: "error", message: "Title and description are required" } satisfies ServerResponse) + "\n");
       return;
     }
 
     const id = getNextId();
-    const lesson = {
+    const lesson: Lesson = {
       id: byteRead(id, COL_ID),
       title: byteRead(title, COL_TITLE),
       desc: byteRead(desc, COL_DESC),
@@ -102,20 +123,19 @@ function handleRequest(socket: net.Socket, raw: string): void {
     appendLesson(lesson);
     console.log(`[Server] Lesson created: [${id}] ${title}`);
 
-    // Respond to the creator
-    socket.write(JSON.stringify({ action: "lesson_created", lesson: { id: String(id), title, desc } }) + "\n");
-    // Broadcast to other clients about the new lesson
-      clients.forEach((client) => {
+    socket.write(JSON.stringify({ action: "lesson_created", lesson } satisfies ServerResponse) + "\n");
+
+    clients.forEach((client) => {
       if (client !== socket && client.writable) {
-        client.write(JSON.stringify({ action: "new_lesson_broadcast", lesson: { id: String(id), title, desc } }) + "\n");
+        client.write(JSON.stringify({ action: "new_lesson_broadcast", lesson } satisfies ServerResponse) + "\n");
       }
     });
   } else if (request.action === "view") {
     const lessons = getAllLessons();
-    socket.write(JSON.stringify({ action: "lessons_list", lessons }) + "\n");
+    socket.write(JSON.stringify({ action: "lessons_list", lessons } satisfies ServerResponse) + "\n");
     console.log(`[Server] Sent ${lessons.length} lessons to a client`);
   } else {
-    socket.write(JSON.stringify({ action: "error", message: `Unknown action: ${request.action}` }) + "\n");
+    socket.write(JSON.stringify({ action: "error", message: `Unknown action: ${request.action}` } satisfies ServerResponse) + "\n");
   }
 }
 

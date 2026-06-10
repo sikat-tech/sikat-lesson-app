@@ -1,5 +1,13 @@
-import net from "node:net";
-import readline from "node:readline";
+import net from "net";
+import readline from "readline";
+
+
+interface ServerResponse {
+  action: string;
+  lessons?: Array<{ id: string; title: string; desc: string }>;
+  message?: string;
+  lesson?: { id: string; title: string; desc: string };
+}
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -37,7 +45,7 @@ client.on("data", (data) => {
   }
 });
 
-function handleServerResponse(response: { action: string; lessons?: Array<{ id: string; title: string; desc: string }>; message?: string; lesson?: { id: string; title: string; desc: string } }) {
+function handleServerResponse(response: ServerResponse) {
   if (response.action === "lesson_created") {
     console.log(`\nLesson created successfully!`);
     if (response.lesson) {
