@@ -11,7 +11,6 @@ function lessonToNDJSON(title: string, description: string) {
     title,
     description,
   };
-
   fs.appendFileSync(filePath, JSON.stringify(lesson) + "\n");
 }
 
@@ -42,11 +41,22 @@ const server = net.createServer((socket) => {
 
   console.log(`total clients connected: ${clientCount}`);
 
-  socket.on("data", (data) => {
-    console.log(`Received data from client : \n ${data.toString()}`);
-    const msg = JSON.parse(data.toString()); // Assuming the client sends JSON data
-    const response = handleClientData(msg); // Process the message and generate a response
-    socket.write(JSON.stringify(response)); // covert the response to JSON and send it back to the client
+  socket.on("data", (data: Buffer) => {
+
+    const title = data.toString("utf-8", 0, 50); 
+
+    const description = data.toString("utf-8", 50, 150);
+
+    const msg = {
+      type: "create_lesson",
+      title,
+      description,
+    };
+    
+    
+    const response = handleClientData(msg);
+
+    socket.write(JSON.stringify(response)); 
   });
 
   socket.on("end", () => {

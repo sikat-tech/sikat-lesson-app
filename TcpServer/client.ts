@@ -18,14 +18,27 @@ const ask = (q: string): Promise<string> =>
 
 
 //
-function sendRecord(Record: any): Promise<any> {
+function sendRecord(record: any): Promise<any> {
   return new Promise((resolve) => {
-    client.once("data", (data) => {
-      resolve(data.toString());
-    });
+   const onData = (data: Buffer) => {
+     client.off("data" , onData);
+      //note ko: .off is used to remove the listener after receiving the response to avoid multiple responses for multiple requests 
+      const response = JSON.parse(data.toString());
+   }
+    client.on("data", onData);
 
-    client.write(JSON.stringify(Record));
+    const buf = Buffer.alloc(150);
+
+    buf.write(record.title || "",0 ,50,"utf-8");
+    buf.write(record.description || "",50 ,100,"utf-8");
+
+    
+
+    client.write(buf);
   });
+
+
+
 }
 
 async function showMenu() {
