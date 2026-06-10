@@ -29,38 +29,42 @@ function sendRecord(Record: any): Promise<any> {
 }
 
 async function showMenu() {
-  console.log("Menu:");
-  console.log("1. Create a Lesson");
-  console.log("2. Exit");
+  while (true) {
+    console.log("Menu:");
+    console.log("1. Create a Lesson");
+    console.log("2. Exit");
 
-  const choice = await ask("Enter your choice: ");
+    const choice = await ask("Enter your choice: ");
 
-  if (choice === "1") {
-    const title = await ask("Enter lesson title: ");
-    const description = await ask("Enter lesson description: ");
+    if (choice === "1") {
+      const title = await ask("Enter lesson title: ");
+      const description = await ask("Enter lesson description: ");
 
-    const record = sendRecord({
-      type: "create_lesson",
-      title,
-      description,
-    });
-    console.log("Record sent to server, waiting for response...");
+      console.log("Sending...");
 
-    await showMenu();
+      const response = await sendRecord({
+        type: "create_lesson",
+        title,
+        description,
+      });
+
+      console.log("Server Response:", response);
+    }
+
+    else if (choice === "2") {
+      console.log("Exiting...");
+
+      rl.close();
+      client.end();
+      break; // IMPORTANT
+    }
   }
-
-  else if (choice === "2") {
-  rl.close();
-  client.end();
-  return;
-  }
-
-  await showMenu();
 }
 
 client.on("connect", () => {
   console.log("Connected to TCP server");
   showMenu();
+
 });
 
 client.on("error", (err) => {
