@@ -23,6 +23,7 @@ interface ClientMessage {
   title?: string;
   description?: string;
   id?: string;
+  page?: number; // for pagination
 }
 
 // A reply BACK to the client
@@ -31,6 +32,7 @@ interface ServerResponse {
   status?: "success" | "error";
   message?: string; // optional message to show the user
   lessons?: LessonRecord[]; // optional list of lessons for view
+  hasNextPage?: boolean; // for pagination
 }
 
 function processRecordBuffer(lesson: LessonRecord): Buffer {
@@ -108,16 +110,26 @@ function handleClientData(msg: ClientMessage): ServerResponse {
   if (msg.type === "view_lessons") {
     if (!fs.existsSync(filePath)) return { ok: true, lessons: [] };
 
-    const size = fs.statSync(filePath).size;
+    const ITEMS_PER_PAGE = 10;
+    const page = msg.page ?? 0; // default to page 0 if client did not send it
 
+    const size = fs.statSync(filePath).size;
     // Number of records = file size divided by the fixed record size
     const totalRecords = Math.floor(size / LINE_RECORD);
+
+    const slotStart = page * ITEMS_PER_PAGE;
+    const slotEnd = Math.min(slotStart + ITEMS_PER_PAGE, totalRecords);
+
+    // If the requested page starts beyond the file, nothing to show
+    if (slotStart >= totalRecords) {
+      return { ok: true, lessons: [], hasNextPage: false };
+    }
 
     const fd = fs.openSync(filePath, "r");
     const lessons: LessonRecord[] = [];
 
     // Read each record slot one by one using the fixed offset
-    for (let i = 0; i < totalRecords; i++) {
+    for (let i = slotStart; i < slotEnd; i++) {
       const lesson = readRecordAt(fd, i * LINE_RECORD);
 
       console.log(lesson);
@@ -190,7 +202,6 @@ function handleClientData(msg: ClientMessage): ServerResponse {
       return { ok: false, message: `Lesson ID ${id} not found.` };
     }
 
-
     const fd = fs.openSync(filePath, "r+");
     const existingLesson = readRecordAt(fd, offset);
 
@@ -200,7 +211,7 @@ function handleClientData(msg: ClientMessage): ServerResponse {
       fs.closeSync(fd);
       return { ok: false, message: `Lesson with ID ${id} not found.` };
     }
-    
+
     // Mark the record as deleted by writing a tombstone value
     writeRecordAt(fd, offset, {
       id: "DELETED",

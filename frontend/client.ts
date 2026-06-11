@@ -12,8 +12,8 @@ interface ServerResponse {
   status?: "success" | "error";
   message?: string;
   lessons?: LessonRecord[];
+  hasNextPage?: boolean;
 }
-
 
 const COL_ID = 12;
 const COL_TITLE = 30;
@@ -38,7 +38,7 @@ const ask = (question: string): Promise<string> =>
 // Send message to the server
 function sendRecord(messageToSend: object): Promise<ServerResponse> {
   return new Promise((resolve) => {
-      client.on("data", (data) => { 
+    client.on("data", (data) => {
       resolve(JSON.parse(data.toString()) as ServerResponse);
     });
 
@@ -49,25 +49,28 @@ function sendRecord(messageToSend: object): Promise<ServerResponse> {
 let currentPage = 0;
 const itemsPerPage = 10;
 
-async function handleViewPagination(lessons: LessonRecord[]): Promise<void> {
-  const startIndex = currentPage * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, lessons.length);
-  const pageLessons = lessons.slice(startIndex, endIndex);
- 
+async function handleViewPagination(): Promise<void> {
+  const response = await sendRecord({
+    type: "view_lessons",
+    page: currentPage,
+  });
+
+  const pagelessons = response.lessons ?? [];
+  const hasNextPage = response.hasNextPage ?? false;
+
   console.log(`\n--- View Lessons (Page ${currentPage + 1}) ---`);
 
-  if (pageLessons.length === 0) {
+   if (pagelessons.length === 0) {
     console.log("No lessons found on this page.");
   } else {
-    pageLessons.forEach((lesson, index) => {
-      console.log(
-        `${startIndex + index + 1}. ID: ${lesson.id} - ${lesson.title} - ${lesson.desc}`,
-      );
+   
+    pagelessons.forEach((lesson, index) => {
+      const itemNumber = currentPage * 10 + index + 1;
+      console.log(`${itemNumber}. ID: ${lesson.id} - ${lesson.title} - ${lesson.desc}`);
     });
   }
 
   const options: string[] = [];
-  const hasNextPage = endIndex < lessons.length;
 
   if (hasNextPage) {
     options.push("N = Next Page");
@@ -84,10 +87,10 @@ async function handleViewPagination(lessons: LessonRecord[]): Promise<void> {
 
   if (choice === "n" && hasNextPage) {
     currentPage++;
-    await handleViewPagination(lessons);
+    await handleViewPagination();
   } else if (choice === "p" && currentPage > 0) {
     currentPage--;
-    await handleViewPagination(lessons);
+    await handleViewPagination();
   } else {
     currentPage = 0;
     await showMenu();
@@ -102,11 +105,11 @@ async function showMenu(): Promise<void> {
   console.log("4. Delete a Lesson");
   console.log("5. Exit");
 
-    const choice = await ask("Enter your choice: ");
+  const choice = await ask("Enter your choice: ");
 
-    if (choice === "1") {
-      const title = await ask("Enter lesson title: ");
-      const description = await ask("Enter lesson description: ");
+  if (choice === "1") {
+    const title = await ask("Enter lesson title: ");
+    const description = await ask("Enter lesson description: ");
 
     console.log("Sending to server, please wait...");
 
@@ -119,14 +122,9 @@ async function showMenu(): Promise<void> {
 
     console.log(`Server says: ${response.message}`);
   } else if (choice === "2") {
-    const response = await sendRecord({ type: "view_lessons" });
-
-    if (response.ok && response.lessons && response.lessons.length > 0) {
-      await handleViewPagination(response.lessons);
-      return;
-    } else {
-      console.log("\nNo lessons available to show.");
-    }
+    currentPage = 0;
+    await handleViewPagination();
+    return;
   } else if (choice === "3") {
     // use promisified method because async/await for multiple sequential inputs
     const id = await ask("Enter the lesson ID to edit: ");
@@ -145,9 +143,7 @@ async function showMenu(): Promise<void> {
     });
 
     console.log(`Server says: ${response.message}`);
-  }
-
-  else if (choice === "4") {
+  } else if (choice === "4") {
     const id = await ask("Enter the lesson ID to delete: ");
 
     const confirm = await ask(
@@ -166,17 +162,15 @@ async function showMenu(): Promise<void> {
     } else {
       console.log("Deletion cancelled. Nothing was changed.");
     }
-  }
-
-  else if (choice === "5") {
+  } else if (choice === "5") {
     console.log("Goodbye!");
-    rl.close();  
-    client.end(); 
+    rl.close();
+    client.end();
     return;
-  }
-
-  else {
-    console.log("That's not a valid option. Please enter valid choice from menu");
+  } else {
+    console.log(
+      "That's not a valid option. Please enter valid choice from menu",
+    );
   }
 
   await showMenu();
@@ -186,7 +180,6 @@ async function showMenu(): Promise<void> {
 client.on("connect", () => {
   console.log("Connected to the server!");
   showMenu();
-
 });
 
 // connection errors
@@ -198,4 +191,3 @@ client.on("error", (err: Error) => {
 client.on("end", () => {
   console.log("\nDisconnected from the server.");
 });
-
