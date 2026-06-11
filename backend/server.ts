@@ -7,7 +7,7 @@ const HOST = "127.0.0.1";
 
 // lesson record required or what looks like.
 interface LessonRecord {
-  id: number | string;
+  id: string;
   title: string;
   desc: string;
 }
@@ -17,7 +17,7 @@ interface ClientMessage {
   type: "create_lesson" | "view_lessons" | "delete_lesson" | "update_lesson";
   title?: string;
   description?: string;
-  id?: string | number;
+  id?: string;
 }
 
 // A reply BACK to the client
@@ -69,7 +69,7 @@ function handleClientData(msg: ClientMessage): ServerResponse {
 
     // Build new lesson object
     const newLesson: LessonRecord = {
-      id: nextId,
+      id: nextId.toString(),
       title: msg.title || "", // use title from client, or blank if no input
       desc: msg.description || "", // use description from client, or blank if no input
     };

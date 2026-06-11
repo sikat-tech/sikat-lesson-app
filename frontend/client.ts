@@ -2,7 +2,7 @@ import * as net from "net";
 import * as readline from "readline";
 
 interface LessonRecord {
-  id: number | string;
+  id: number;
   title: string;
   desc: string;
 }
@@ -47,7 +47,7 @@ async function handleViewPagination(lessons: LessonRecord[]): Promise<void> {
   const startIndex = currentPage * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, lessons.length);
   const pageLessons = lessons.slice(startIndex, endIndex);
-
+ 
   console.log(`\n--- View Lessons (Page ${currentPage + 1}) ---`);
 
   if (pageLessons.length === 0) {
