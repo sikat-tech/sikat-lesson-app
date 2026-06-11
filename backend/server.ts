@@ -108,43 +108,72 @@ function handleClientData(msg: ClientMessage): ServerResponse {
   }
 
   // Client Request to View lesson
-  if (msg.type === "view_lessons") {
-    if (!fs.existsSync(filePath)) return { ok: true, lessons: [] };
+ if (msg.type === "view_lessons") {
+    if (!fs.existsSync(filePath))
+      return { ok: true, lessons: [], hasNextPage: false };
 
     const ITEMS_PER_PAGE = 10;
-    const page = msg.page ?? 0; // default to page 0 if client did not send it
-
+    const page = msg.page ?? 0; // default to page 0 if client did not send itåå
     const size = fs.statSync(filePath).size;
     // Number of records = file size divided by the fixed record size
     const totalRecords = Math.floor(size / LINE_RECORD);
 
-    const slotStart = page * ITEMS_PER_PAGE;
-    const slotEnd = Math.min(slotStart + ITEMS_PER_PAGE, totalRecords);
-
-    // If the requested page starts beyond the file, nothing to show
-    if (slotStart >= totalRecords) {
-      return { ok: true, lessons: [], hasNextPage: false };
-    }
-
     const fd = fs.openSync(filePath, "r");
     const lessons: LessonRecord[] = [];
 
-    // Read each record slot one by one using the fixed offset
-    for (let i = slotStart; i < slotEnd; i++) {
-      const lesson = readRecordAt(fd, i * LINE_RECORD);
+    // const slotStart = page * ITEMS_PER_PAGE;
+    // const slotEnd = Math.min(slotStart + ITEMS_PER_PAGE, totalRecords);
+
+    // // If the requested page starts beyond the file, nothing to show
+    // if (slotStart >= totalRecords) {
+    //   return { ok: true, lessons: [], hasNextPage: false };
+    // }
+
+    let currentSlot = 0;
+    let validLessons = 0;
+    const targetSkipCount = page * ITEMS_PER_PAGE;
+
+    // Find where the requested page should actually start
+    while (currentSlot < totalRecords && validLessons < targetSkipCount) {
+      const lesson = readRecordAt(fd, currentSlot * LINE_RECORD);
 
       console.log(lesson);
+      if (lesson && lesson.id !== "DELETED") {
+        validLessons++;
+      }
+      currentSlot++;
+    }
 
-      // Filter out tombstone (deleted) records
+    // Collect 10 valid lesson for each page
+    while (currentSlot < totalRecords && lessons.length < ITEMS_PER_PAGE) {
+      const lesson = readRecordAt(fd, currentSlot * LINE_RECORD);
+      console.log(ITEMS_PER_PAGE);
       if (lesson && lesson.id !== "DELETED") {
         lessons.push(lesson);
       }
+      currentSlot++;
+    }
+
+    // Next Page check valid lessons
+    let hasNextPage = false;
+    while (currentSlot < totalRecords) {
+      const lesson = readRecordAt(fd, currentSlot * LINE_RECORD);
+      console.log("Checking for next page, found lesson:", lesson);
+      if (lesson && lesson.id !== "DELETED") {
+        hasNextPage = true;
+        break;
+      }
+      currentSlot++;
     }
 
     fs.closeSync(fd);
-    return { ok: true, lessons };
-  }
 
+    return {
+      ok: true,
+      lessons,
+      hasNextPage,
+    };
+  }
   // Client to UPDATE a lesson
   if (msg.type === "update_lesson") {
     const id = Number(msg.id);
