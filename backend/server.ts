@@ -192,11 +192,13 @@ function handleClientData(msg: ClientMessage): ServerResponse {
   return { ok: false, status: "error", message: "Invalid request type" };
 }
 
+let clientCounter = 0;
 // Server setup
 // createServer that listens for incoming connections.
 const server: net.Server = net.createServer((socket: net.Socket) => {
   console.log("A client has connected!");
-
+  clientCounter++;
+  console.log(`Total connected clients: ${clientCounter}`);
   // runs ever time client sends data through the socket
   socket.on("data", (data: Buffer) => {
     try {
