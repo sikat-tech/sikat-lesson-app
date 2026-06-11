@@ -32,7 +32,7 @@ const ask = (question: string): Promise<string> =>
 // Send message to the server
 function sendRecord(messageToSend: object): Promise<ServerResponse> {
   return new Promise((resolve) => {
-    client.on("data", (data) => {
+    client.once("data", (data) => { //.once MaxListenersExceededWarning
       resolve(JSON.parse(data.toString()) as ServerResponse);
     });
 
