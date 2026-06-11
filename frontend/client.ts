@@ -103,7 +103,8 @@ async function showMenu(): Promise<void> {
   console.log("2. View Lessons");
   console.log("3. Edit a Lesson");
   console.log("4. Delete a Lesson");
-  console.log("5. Exit");
+  console.log("5. View Lessons Sorted by Title");
+  console.log("6. Exit");
 
   const choice = await ask("Enter your choice: ");
 
@@ -162,7 +163,26 @@ async function showMenu(): Promise<void> {
     } else {
       console.log("Deletion cancelled. Nothing was changed.");
     }
-  } else if (choice === "5") {
+  } 
+  else if (choice === "5") {
+    const sortBy = await ask("Sort lessons by title? (Y/N): ");
+
+    console.log("Fetching lessons from server...");
+
+    const response = await sendRecord({
+      type: "sort_by_title",
+      sortBy: sortBy.toLowerCase() === "y" ? "title" : undefined,
+    });
+
+    if (response.ok && response.lessons && response.lessons.length > 0) {
+      await handleViewPagination();
+      return;
+    } else {
+      console.log("\nNo lessons available to show.");
+    }
+  }
+
+  else if (choice === "6") {
     console.log("Goodbye!");
     rl.close();
     client.end();

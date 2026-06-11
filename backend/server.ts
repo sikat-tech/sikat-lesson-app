@@ -23,6 +23,7 @@ interface ClientMessage {
   title?: string;
   description?: string;
   id?: string;
+  sortBy?: "title"; // for sorting
   page?: number; // for pagination
 }
 
@@ -221,6 +222,66 @@ function handleClientData(msg: ClientMessage): ServerResponse {
     fs.closeSync(fd);
     return { ok: true, message: `Lesson with ID ${id} deleted successfully.` };
   }
+
+  if (msg.type === "sort_by_title") {
+    if (!fs.existsSync(filePath)) {
+      return { ok: true, status: "success", lessons: [] };
+    }
+    //binabasa pa lahat ng records
+    const lessons: LessonRecord[] = [];
+    const size = fs.statSync(filePath).size;
+    const fd = fs.openSync(filePath, "r");
+    let offset = 0;
+    
+    const LIMIT = 10;
+
+    // debugger counters
+    let totalChunksRead = 0;
+    let validRecordsCount = 0;
+    let deletedRecordsCount = 0;
+
+    while (offset < size && totalChunksRead < LIMIT) {
+      const record = readRecordAt(fd, offset);
+      totalChunksRead++;
+      
+      
+      if (record && record.id !== "DELETED") {
+        lessons.push(record);
+        validRecordsCount++;
+      }
+      else{
+      deletedRecordsCount++;
+      }
+      offset += LINE_RECORD;
+    }
+
+    fs.closeSync(fd);
+    //debugger logs just to verify the reading process and counts
+    console.log(`Total chunks read: ${totalChunksRead}`);
+    console.log(`Valid records found: ${validRecordsCount}`);
+    console.log(`Deleted records skipped: ${deletedRecordsCount}`);
+    
+    // sort the lessons by title if requested
+    if (msg.sortBy === "title") {
+      lessons.sort((a, b) => {
+        // Normalize for case-insensitive sorting and trim whitespace padding
+        const titleA = a.title.trim().toLowerCase();
+        const titleB = b.title.trim().toLowerCase();
+        
+        if (titleA < titleB) return -1;
+        if (titleA > titleB) return 1;
+        return 0;
+      });
+    }
+
+    return {
+      ok: true,
+      status: "success",
+      lessons: lessons
+    };
+  }
+
+
 
   return { ok: false, status: "error", message: "Invalid request type" };
 }
