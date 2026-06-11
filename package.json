@@ -1,0 +1,25 @@
+{
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  },
+  "name": "sikat-lesson-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sikat-tech/sikat-lesson-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/sikat-tech/sikat-lesson-app/issues"
+  },
+  "homepage": "https://github.com/sikat-tech/sikat-lesson-app#readme"
+}
