@@ -136,8 +136,6 @@ function handleClientData(msg: ClientMessage): ServerResponse {
     // Find where the requested page should actually start
     while (currentSlot < totalRecords && validLessons < targetSkipCount) {
       const lesson = readRecordAt(fd, currentSlot * LINE_RECORD);
-
-      console.log(lesson);
       if (lesson && lesson.id !== "DELETED") {
         validLessons++;
       }
@@ -147,7 +145,6 @@ function handleClientData(msg: ClientMessage): ServerResponse {
     // Collect 10 valid lesson for each page
     while (currentSlot < totalRecords && lessons.length < ITEMS_PER_PAGE) {
       const lesson = readRecordAt(fd, currentSlot * LINE_RECORD);
-      console.log(ITEMS_PER_PAGE);
       if (lesson && lesson.id !== "DELETED") {
         lessons.push(lesson);
       }
@@ -252,64 +249,75 @@ function handleClientData(msg: ClientMessage): ServerResponse {
     return { ok: true, message: `Lesson with ID ${id} deleted successfully.` };
   }
 
-  if (msg.type === "sort_by_title") {
-    if (!fs.existsSync(filePath)) {
-      return { ok: true, status: "success", lessons: [] };
-    }
-    //binabasa pa lahat ng records
-    const lessons: LessonRecord[] = [];
-    const size = fs.statSync(filePath).size;
-    const fd = fs.openSync(filePath, "r");
-    let offset = 0;
-    
-    const LIMIT = 10;
-
-    // debugger counters
-    let totalChunksRead = 0;
-    let validRecordsCount = 0;
-    let deletedRecordsCount = 0;
-
-    while (offset < size && totalChunksRead < LIMIT) {
-      const record = readRecordAt(fd, offset);
-      totalChunksRead++;
-      
-      
-      if (record && record.id !== "DELETED") {
-        lessons.push(record);
-        validRecordsCount++;
-      }
-      else{
-      deletedRecordsCount++;
-      }
-      offset += LINE_RECORD;
-    }
-
-    fs.closeSync(fd);
-    //debugger logs just to verify the reading process and counts
-    console.log(`Total chunks read: ${totalChunksRead}`);
-    console.log(`Valid records found: ${validRecordsCount}`);
-    console.log(`Deleted records skipped: ${deletedRecordsCount}`);
-    
-    // sort the lessons by title if requested
-    if (msg.sortBy === "title") {
-      lessons.sort((a, b) => {
-        // Normalize for case-insensitive sorting and trim whitespace padding
-        const titleA = a.title.trim().toLowerCase();
-        const titleB = b.title.trim().toLowerCase();
-        
-        if (titleA < titleB) return -1;
-        if (titleA > titleB) return 1;
-        return 0;
-      });
-    }
-
-    return {
-      ok: true,
-      status: "success",
-      lessons: lessons
-    };
+if (msg.type === "sort_by_title") {
+  if (!fs.existsSync(filePath)) {
+    return { ok: true, status: "success", lessons: [], hasNextPage: false };
   }
 
+  const ITEMS_PER_PAGE = 10;
+  const page = msg.page ?? 0;
+  const size = fs.statSync(filePath).size;
+  const totalRecords = Math.floor(size / LINE_RECORD);
+
+  const fd = fs.openSync(filePath, "r");
+  const lessons: LessonRecord[] = [];
+
+  let currentSlot = 0;
+  let validLessonsCount = 0;
+  const targetSkipCount = page * ITEMS_PER_PAGE;
+
+  // Skip records from previous pages
+  while (currentSlot < totalRecords && validLessonsCount < targetSkipCount) {
+    const lesson = readRecordAt(fd, currentSlot * LINE_RECORD);
+    if (lesson && lesson.id !== "DELETED") {
+      validLessonsCount++;
+    }
+    currentSlot++;
+  }
+
+  const startByteOffset = currentSlot * LINE_RECORD;
+
+  // Collect exactly 10 valid lessons for the current page
+  while (currentSlot < totalRecords && lessons.length < ITEMS_PER_PAGE) {
+    const lesson = readRecordAt(fd, currentSlot * LINE_RECORD);
+    if (lesson && lesson.id !== "DELETED") {
+      lessons.push(lesson);
+    }
+    currentSlot++;
+  }
+
+  const endByteOffset = currentSlot * LINE_RECORD;
+
+  // Look ahead to see if there is a next page
+  let hasNextPage = false;
+  while (currentSlot < totalRecords) {
+    const lesson = readRecordAt(fd, currentSlot * LINE_RECORD);
+    if (lesson && lesson.id !== "DELETED") {
+      hasNextPage = true;
+      break;
+    }
+    currentSlot++;
+  }
+
+  fs.closeSync(fd);
+
+  // Sort only the collected page's records
+  if (msg.sortBy === "title" && lessons.length > 0) {
+    lessons.sort((a, b) => a.title.trim().toLowerCase().localeCompare(b.title.trim().toLowerCase()));
+  }
+
+  console.log(`File Size: ${size} bytes (${totalRecords} slots)`);
+  console.log(`Page Requested: ${page} | Skipped: ${validLessonsCount} items`);
+  console.log(`Read Window: Started at byte ${startByteOffset} -> Stopped at byte ${endByteOffset}`);
+  console.log(`Output: Sent ${lessons.length} sorted lessons | Has Next Page: ${hasNextPage}\n`);
+
+  return {
+    ok: true,
+    status: "success",
+    lessons, 
+    hasNextPage,
+  };
+}
 
 
   return { ok: false, status: "error", message: "Invalid request type" };

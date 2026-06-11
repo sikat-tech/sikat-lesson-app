@@ -165,22 +165,51 @@ async function showMenu(): Promise<void> {
     }
   } 
   else if (choice === "5") {
-    const sortBy = await ask("Sort lessons by title? (Y/N): ");
+  const sortByChoice = await ask("Sort lessons by title? (Y/N): ");
+  const sortBy = sortByChoice.toLowerCase() === "y" ? "title" : undefined;
 
-    console.log("Fetching lessons from server...");
+  let currentPage = 0;
+  let keepViewing = true;
 
+  while (keepViewing) {
+    console.log(`\nFetching sorted lessons (Page ${currentPage + 1})...`);
+
+    // Pass BOTH the sorting rules AND the current page to the server
     const response = await sendRecord({
       type: "sort_by_title",
-      sortBy: sortBy.toLowerCase() === "y" ? "title" : undefined,
+      sortBy: sortBy,
+      page: currentPage, 
     });
 
     if (response.ok && response.lessons && response.lessons.length > 0) {
-      await handleViewPagination();
-      return;
+      console.log("\n--- Sorted Lessons ---");
+      response.lessons.forEach((lesson) => {
+        console.log(`Title: ${lesson.title.trim()}`);
+      });
+    
+      console.log(`\n[Current Page: ${currentPage + 1}]`);
+      if (response.hasNextPage) console.log("N. Next Page");
+      if (currentPage > 0) console.log("P. Previous Page");
+
+      console.log("M. Main Menu");
+      const nav = (await ask("Choose an option: ")).toUpperCase();
+
+
+      if (nav === "N" && response.hasNextPage) {
+        currentPage++;
+      } else if (nav === "P" && currentPage > 0) {
+        currentPage--;
+      } else if (nav === "M") {
+        keepViewing = false;
+      } else {
+        console.log("Invalid option.");
+      }
     } else {
-      console.log("\nNo lessons available to show.");
+      console.log("\nNo lessons available to show on this page.");
+      keepViewing = false;
     }
   }
+}
 
   else if (choice === "6") {
     console.log("Goodbye!");
