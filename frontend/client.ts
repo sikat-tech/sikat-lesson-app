@@ -14,6 +14,12 @@ interface ServerResponse {
   lessons?: LessonRecord[];
 }
 
+
+const COL_ID = 12;
+const COL_TITLE = 30;
+const COL_DESC = 223;
+const LINE_RECORD = 318;
+
 // Connect to server on port 8080, same machine localhost.
 const client: net.Socket = net.createConnection(
   { port: 8080, host: "127.0.0.1" },
