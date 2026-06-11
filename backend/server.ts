@@ -106,7 +106,30 @@ function handleClientData(msg: ClientMessage): ServerResponse {
 
   // Client Request to View lesson
   if (msg.type === "view_lessons") {
-   
+    if (!fs.existsSync(filePath)) return { ok: true, lessons: [] };
+
+    const size = fs.statSync(filePath).size;
+
+    // Number of records = file size divided by the fixed record size
+    const totalRecords = Math.floor(size / LINE_RECORD);
+
+    const fd = fs.openSync(filePath, "r");
+    const lessons: LessonRecord[] = [];
+
+    // Read each record slot one by one using the fixed offset
+    for (let i = 0; i < totalRecords; i++) {
+      const lesson = readRecordAt(fd, i * LINE_RECORD);
+
+      console.log(lesson);
+
+      // Filter out tombstone (deleted) records
+      if (lesson && lesson.id !== "DELETED") {
+        lessons.push(lesson);
+      }
+    }
+
+    fs.closeSync(fd);
+    return { ok: true, lessons };
   }
 
   // Client to UPDATE a lesson
@@ -132,6 +155,8 @@ function handleClientData(msg: ClientMessage): ServerResponse {
 
     const existingLesson = readRecordAt(fd, offset);
 
+    console.log("Existing lesson:", existingLesson);
+
     if (!existingLesson || existingLesson.id === "DELETED") {
       fs.closeSync(fd);
       return { ok: false, message: `Lesson with ID ${id} not found.` };
@@ -143,48 +168,47 @@ function handleClientData(msg: ClientMessage): ServerResponse {
       desc: msg.description || existingLesson.desc,
     });
 
-
     fs.closeSync(fd);
     return { ok: true, message: `Lesson with ID ${id} updated successfully.` };
   }
 
   // Client wants to DELETE a lesson
   if (msg.type === "delete_lesson") {
+    const id = Number(msg.id);
+    if (isNaN(id) || id < 1) {
+      return { ok: false, message: "Invalid lesson ID." };
+    }
+
     if (!fs.existsSync(filePath)) {
       return { ok: false, message: "No data file exists." };
     }
 
-    const content: string = fs.readFileSync(filePath, "utf8");
-    const lines: string[] = content.split("\n");
-    let found = false;
+    const offset = byteOffset(id);
+    const size = fs.statSync(filePath).size;
 
-    for (let i = 0; i < lines.length; i++) {
-      const currentLine = lines[i];
-
-      if (!currentLine || !currentLine.trim()) continue;
-
-      try {
-        const parsed = JSON.parse(currentLine) as LessonRecord;
-
-        // If match yung ID na client wants to delete
-        if (parsed && String(parsed.id) === String(msg.id)) {
-          // replace it with a "DELETED" marker.
-          lines[i] = JSON.stringify({ id: "DELETED", title: "", desc: "" });
-
-          found = true;
-          break;
-        }
-      } catch {
-        console.log("Found a broken line in the file, skipping it...");
-      }
+    if (offset + LINE_RECORD > size) {
+      return { ok: false, message: `Lesson ID ${id} not found.` };
     }
 
-    if (found) {
-      fs.writeFileSync(filePath, lines.join("\n"));
-      return { ok: true, message: `Lesson ${msg.id} marked as DELETED.` };
-    }
 
-    return { ok: false, message: "Lesson ID not found or already deleted." };
+    const fd = fs.openSync(filePath, "r+");
+    const existingLesson = readRecordAt(fd, offset);
+
+    console.log("Existing lesson for deletion:", existingLesson);
+
+    if (!existingLesson || existingLesson.id === "DELETED") {
+      fs.closeSync(fd);
+      return { ok: false, message: `Lesson with ID ${id} not found.` };
+    }
+    
+    // Mark the record as deleted by writing a tombstone value
+    writeRecordAt(fd, offset, {
+      id: "DELETED",
+      title: "",
+      desc: "",
+    });
+    fs.closeSync(fd);
+    return { ok: true, message: `Lesson with ID ${id} deleted successfully.` };
   }
 
   return { ok: false, status: "error", message: "Invalid request type" };
