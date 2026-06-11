@@ -246,6 +246,8 @@ const server: net.Server = net.createServer((socket: net.Socket) => {
   // runs when the client disconnects
   socket.on("end", () => {
     console.log("Client disconnected.");
+    clientCounter--;
+    console.log(`Total connected clients: ${clientCounter}`);
   });
 });
 
