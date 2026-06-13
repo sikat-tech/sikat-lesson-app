@@ -4,8 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "server": "node --experimental-strip-types server.ts",
-    "client": "node --experimental-strip-types client.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -22,7 +20,6 @@
   "homepage": "https://github.com/sikat-tech/sikat-lesson-app#readme",
   "devDependencies": {
     "@types/node": "^25.9.3",
-    "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }
 }

@@ -1,7 +1,7 @@
 import * as net from "net";
-import { PORT, HOST } from "./shared/constants.ts";
-import type { ClientMessage, ServerResponse } from "./shared/types.ts";
-import { handleClientData } from "./server/handlers.ts";
+import { PORT, HOST } from "./shared/constants";
+import { ClientMessage, ServerResponse } from "./shared/types";
+import { handleClientData } from "./server/handlers";
 
 let clientCounter = 0;
 
@@ -14,7 +14,7 @@ const server: net.Server = net.createServer((socket: net.Socket) => {
     try {
       console.log(`Message received from client: ${data.toString()}`);
       const msg = JSON.parse(data.toString()) as ClientMessage;
-
+      
       const response = handleClientData(msg);
       socket.write(JSON.stringify(response));
     } catch (err) {
