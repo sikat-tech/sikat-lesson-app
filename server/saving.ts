@@ -2,6 +2,7 @@ import * as fs from "fs";
 import { FILE_PATH, LINE_RECORD, COL_ID, COL_TITLE, COL_DESC } from "../shared/constants.ts";
 import type { LessonRecord } from "../shared/types.ts";
 
+
 // Serializes a record and forces it into a fixed size block
 export function processRecordBuffer(lesson: LessonRecord): Buffer {
   const trimmed = {
